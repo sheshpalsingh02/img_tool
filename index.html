@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ImgTool — All-in-One Image Toolkit | Compress, Resize, Convert, Crop</title>
+<meta name="description" content="Free all-in-one image toolkit. Compress, resize, convert, crop, rotate and edit images 100% in your browser. No upload, private & fast.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      fontFamily: { sans: ['Inter','sans-serif'], mono: ['JetBrains Mono','monospace'] },
+      colors: {
+        brand: { 50:'#f0f9ff', 100:'#e0f2fe', 500:'#0ea5e9', 600:'#0284c7', 700:'#0369a1' }
+      },
+      animation: { 'in': 'in 0.4s ease-out', 'float': 'float 6s ease-in-out infinite' },
+      keyframes: {
+        in: { '0%':{opacity:'0',transform:'translateY(8px)'}, '100%':{opacity:'1',transform:'translateY(0)'} },
+        float: { '0%,100%':{transform:'translateY(0)'}, '50%':{transform:'translateY(-8px)'} }
+      }
+    }
+  }
+}
+</script>
+<style>
+  *{ -webkit-font-smoothing:antialiased }
+  .checker{background-image:linear-gradient(45deg,#e5e7eb 25%,transparent 25%),linear-gradient(-45deg,#e5e7eb 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#e5e7eb 75%),linear-gradient(-45deg,transparent 75%,#e5e7eb 75%);background-size:20px 20px;background-position:0 0,0 10px,10px -10px,-10px 0px}
+  .dark .checker{background-image:linear-gradient(45deg,#1f2937 25%,transparent 25%),linear-gradient(-45deg,#1f2937 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#1f2937 75%),linear-gradient(-45deg,transparent 75%,#1f2937 75%)}
+  input[type=range]{ -webkit-appearance:none; appearance:none; height:6px; background:#e5e7eb; border-radius:999px; outline:none }
+  .dark input[type=range]{ background:#374151 }
+  input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; width:18px; height:18px; background:#0ea5e9; border-radius:50%; cursor:pointer; border:3px solid white; box-shadow:0 1px 4px rgba(0,0,0,.2) }
+  .dark input[type=range]::-webkit-slider-thumb{ border-color:#111827 }
+  .glass{ backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px) }
+  ::-webkit-scrollbar{ width:6px; height:6px }
+  ::-webkit-scrollbar-thumb{ background:#cbd5e1; border-radius:999px } .dark ::-webkit-scrollbar-thumb{ background:#334155 }
+</style>
+</head>
+<body class="bg-[#fcfcfd] dark:bg-[#0a0a0b] text-zinc-900 dark:text-zinc-100 font-sans antialiased selection:bg-sky-500/20">
+<!-- Header -->
+<header class="sticky top-0 z-40 border-b border-zinc-200/70 dark:border-zinc-800/80 bg-white/80 dark:bg-zinc-900/70 glass">
+  <div class="max-w-[1600px] mx-auto px-4 md:px-6 h-[64px] flex items-center justify-between">
+    <div class="flex items-center gap-8">
+      <a href="#" class="flex items-center gap-2.5 group">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 to-violet-600 flex items-center justify-center text-white font-bold text-[16px] shadow-lg shadow-sky-500/20 group-hover:shadow-sky-500/30 transition">◐</div>
+        <div class="leading-none">
+          <div class="font-extrabold tracking-tight text-[18px]">IMGTOOL</div>
+          <div class="text-[10px] font-bold tracking-[0.18em] text-zinc-500 dark:text-zinc-400 -mt-0.5">STUDIO</div>
+        </div>
+      </a>
+      <div class="hidden lg:flex items-center gap-1 text-[13px] font-medium">
+        <span class="px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200/50 dark:border-emerald-800 flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>100% Offline • Private</span>
+        <span class="px-2.5 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">No Upload</span>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <button id="pasteBtn" class="hidden md:flex h-9 px-3.5 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[13px] font-semibold items-center gap-1.5 hover:opacity-90 transition"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v3"/></svg>Paste</button>
+      <button id="themeBtn" class="w-9 h-9 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center hover:bg-zinc-200 dark:hover:bg-zinc-700 transition">🌙</button>
+      <a href="https://github.com" target="_blank" class="w-9 h-9 rounded-full bg-zinc-100 dark:bg-zinc-800 hidden md:flex items-center justify-center hover:bg-zinc-200 transition"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23.54.915 1.395.66 1.74.51.105-.39.42-.66.765-.81-2.685-.3-5.52-1.335-5.52-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.105-3.195 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.645 1.665.225 2.895.105 3.195.765.84 1.23 1.92 1.23 3.225 0 4.605-2.835 5.625-5.535 5.925.435.375.825 1.095.825 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg></a>
+    </div>
+  </div>
+</header>
+
+<!-- Empty State / Dropzone -->
+<div id="emptyState" class="max-w-[1600px] mx-auto px-4 md:px-6 py-8 md:py-12">
+  <div class="grid lg:grid-cols-[1.15fr_0.85fr] gap-8 items-start">
+    <!-- Left Hero -->
+    <div>
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-50 dark:bg-violet-950/40 border border-violet-200 dark:border-violet-800 text-[12px] font-semibold text-violet-700 dark:text-violet-300 mb-5">
+        <span class="px-1.5 py-0.5 rounded-full bg-violet-600 text-white text-[10px]">NEW</span> Batch compress + WebP/AVIF support
+      </div>
+      <h1 class="text-[38px] md:text-[56px] font-extrabold leading-[0.95] tracking-[-0.03em]">Pro image tools,<br><span class="bg-gradient-to-r from-sky-500 via-violet-500 to-fuchsia-500 bg-clip-text text-transparent">right in browser.</span></h1>
+      <p class="mt-4 text-[16px] md:text-[18px] leading-relaxed text-zinc-600 dark:text-zinc-400 max-w-[560px]">Compress, resize, convert, crop, rotate & add filters — all offline, no upload. Built for creators, devs and designers who care about privacy and speed.</p>
+
+      <!-- Dropzone -->
+      <div id="dropzone" class="group mt-8 relative rounded-[24px] border-[1.5px] border-dashed border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-3 md:p-4 shadow-[0_16px_40px_-16px_rgba(0,0,0,.15)] hover:border-sky-400 dark:hover:border-sky-500 transition-all cursor-pointer">
+        <div class="rounded-[16px] bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200/60 dark:border-zinc-700/60 p-8 md:p-12 text-center">
+          <div class="mx-auto w-14 h-14 rounded-2xl bg-gradient-to-br from-sky-500 to-violet-600 flex items-center justify-center text-white shadow-lg shadow-sky-500/20 mb-5 animate-float">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          </div>
+          <div class="text-[20px] font-bold tracking-tight">Drop images here</div>
+          <div class="mt-1 text-[14px] text-zinc-500 dark:text-zinc-400">or click to browse • Paste (Ctrl+V) • Drag from Figma</div>
+          <div class="mt-6 flex flex-wrap justify-center gap-2 text-[11px] font-medium">
+            <span class="px-2.5 py-1 rounded-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700">JPG</span>
+            <span class="px-2.5 py-1 rounded-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700">PNG</span>
+            <span class="px-2.5 py-1 rounded-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700">WEBP</span>
+            <span class="px-2.5 py-1 rounded-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700">AVIF</span>
+            <span class="px-2.5 py-1 rounded-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700">GIF</span>
+          </div>
+          <button class="mt-6 h-11 px-6 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-semibold text-[14px] shadow-lg hover:opacity-90 transition">Choose Images</button>
+          <div class="mt-3 text-[11px] text-zinc-400">Max 50MB per file • Works offline after first load</div>
+        </div>
+        <input id="fileInput" type="file" accept="image/*" multiple class="hidden">
+      </div>
+
+      <!-- Sample images -->
+      <div class="mt-6">
+        <div class="text-[12px] font-semibold tracking-widest text-zinc-400 uppercase">Try sample</div>
+        <div class="mt-3 grid grid-cols-3 gap-3">
+          <button data-sample="https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1200" class="group/sample relative aspect-[4/3] rounded-xl overflow-hidden bg-zinc-100 dark:bg-zinc-800"><img src="https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=400" class="w-full h-full object-cover group-hover/sample:scale-105 transition duration-500"><div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover/sample:opacity-100 transition"></div><span class="absolute bottom-1.5 left-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/90 text-zinc-900">Landscape</span></button>
+          <button data-sample="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=1200" class="group/sample relative aspect-[4/3] rounded-xl overflow-hidden bg-zinc-100 dark:bg-zinc-800"><img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400" class="w-full h-full object-cover group-hover/sample:scale-105 transition duration-500"><span class="absolute bottom-1.5 left-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/90 text-zinc-900">Portrait</span></button>
+          <button data-sample="https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=1200" class="group/sample relative aspect-[4/3] rounded-xl overflow-hidden bg-zinc-100 dark:bg-zinc-800"><img src="https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=400" class="w-full h-full object-cover group-hover/sample:scale-105 transition duration-500"><span class="absolute bottom-1.5 left-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/90 text-zinc-900">Product</span></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Feature Cards -->
+    <div class="lg:sticky lg:top-[88px] grid gap-4">
+      <div class="rounded-[20px] bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 shadow-sm">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <div class="w-10 h-10 rounded-xl bg-sky-50 dark:bg-sky-950/50 border border-sky-100 dark:border-sky-900 flex items-center justify-center text-sky-600 dark:text-sky-400">⚡</div>
+            <div class="mt-3 font-bold text-[16px]">Lightning fast compression</div>
+            <div class="mt-1 text-[13px] leading-relaxed text-zinc-600 dark:text-zinc-400">Smart quality slider, WebP/AVIF conversion, batch zip download. Reduce 80% size with no visible loss.</div>
+          </div>
+          <div class="text-[11px] font-mono px-2 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">-78% avg</div>
+        </div>
+        <div class="mt-4 h-[48px] rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 p-1 flex items-center gap-1">
+          <div class="h-full flex-1 rounded-lg bg-zinc-900 dark:bg-white flex items-center justify-center text-[12px] font-bold text-white dark:text-zinc-900">Original 4.2 MB</div>
+          <div class="text-zinc-400">→</div>
+          <div class="h-full flex-1 rounded-lg bg-gradient-to-r from-sky-500 to-violet-600 flex items-center justify-center text-[12px] font-bold text-white">0.9 MB WebP</div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-4">
+        <div class="rounded-[20px] bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5">
+          <div class="w-9 h-9 rounded-xl bg-violet-50 dark:bg-violet-950/50 border border-violet-100 dark:border-violet-900 flex items-center justify-center">◫</div>
+          <div class="mt-3 font-semibold text-[14px]">Resize & Crop</div>
+          <div class="mt-1 text-[12px] text-zinc-500 leading-relaxed">Presets for Instagram, OG, YouTube. Lock aspect, % scale, smart crop box.</div>
+        </div>
+        <div class="rounded-[20px] bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5">
+          <div class="w-9 h-9 rounded-xl bg-fuchsia-50 dark:bg-fuchsia-950/50 border border-fuchsia-100 dark:border-fuchsia-900 flex items-center justify-center">◍</div>
+          <div class="mt-3 font-semibold text-[14px]">Filters & Adjust</div>
+          <div class="mt-1 text-[12px] text-zinc-500 leading-relaxed">Brightness, contrast, blur, hue, grayscale — live preview on canvas.</div>
+        </div>
+        <div class="rounded-[20px] bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5">
+          <div class="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950/50 border border-amber-100 dark:border-amber-900 flex items-center justify-center">⇄</div>
+          <div class="mt-3 font-semibold text-[14px]">Convert Format</div>
+          <div class="mt-1 text-[12px] text-zinc-500 leading-relaxed">JPG ↔ PNG ↔ WebP ↔ AVIF. Keep transparency, choose quality.</div>
+        </div>
+        <div class="rounded-[20px] bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5">
+          <div class="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-100 dark:border-emerald-900 flex items-center justify-center">✦</div>
+          <div class="mt-3 font-semibold text-[14px]">Watermark</div>
+          <div class="mt-1 text-[12px] text-zinc-500 leading-relaxed">Add text watermark, 9 positions, opacity & color control.</div>
+        </div>
+      </div>
+
+      <div class="rounded-[20px] bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 p-5 flex items-center gap-4">
+        <div class="w-12 h-12 rounded-full bg-white/10 dark:bg-zinc-900/10 flex items-center justify-center text-[20px]">🔒</div>
+        <div>
+          <div class="font-bold text-[14px]">Privacy first</div>
+          <div class="text-[12px] opacity-70 leading-relaxed">Images never leave your device. All processing via Canvas API. No tracking, no cookies.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- App State -->
+<div id="appState" class="hidden max-w-[1600px] mx-auto">
+  <div class="flex flex-col lg:flex-row min-h-[calc(100vh-64px)]">
+    <!-- Tools Sidebar -->
+    <aside class="lg:w-[88px] border-b lg:border-b-0 lg:border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 lg:sticky lg:top-[64px] lg:h-[calc(100vh-64px)] z-20">
+      <div class="flex lg:flex-col gap-1 p-2 overflow-x-auto lg:overflow-visible scrollbar-none">
+        <button data-tool="compress" class="tool-btn active flex lg:flex-col items-center gap-1.5 lg:gap-1 px-3 lg:px-2 py-2.5 lg:py-3 rounded-xl lg:rounded-2xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-semibold text-[12px] lg:text-[11px] min-w-[72px] lg:min-w-0 transition">
+          <span class="text-[18px]">🗜️</span><span>Compress</span>
+        </button>
+        <button data-tool="resize" class="tool-btn flex lg:flex-col items-center gap-1.5 lg:gap-1 px-3 lg:px-2 py-2.5 lg:py-3 rounded-xl lg:rounded-2xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-medium text-[12px] lg:text-[11px] min-w-[72px] lg:min-w-0 transition"><span class="text-[18px]">↔️</span><span>Resize</span></button>
+        <button data-tool="convert" class="tool-btn flex lg:flex-col items-center gap-1.5 lg:gap-1 px-3 lg:px-2 py-2.5 lg:py-3 rounded-xl lg:rounded-2xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-medium text-[12px] lg:text-[11px] min-w-[72px] lg:min-w-0 transition"><span class="text-[18px]">⇄</span><span>Convert</span></button>
+        <button data-tool="crop" class="tool-btn flex lg:flex-col items-center gap-1.5 lg:gap-1 px-3 lg:px-2 py-2.5 lg:py-3 rounded-xl lg:rounded-2xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-medium text-[12px] lg:text-[11px] min-w-[72px] lg:min-w-0 transition"><span class="text-[18px]">◫</span><span>Crop</span></button>
+        <button data-tool="rotate" class="tool-btn flex lg:flex-col items-center gap-1.5 lg:gap-1 px-3 lg:px-2 py-2.5 lg:py-3 rounded-xl lg:rounded-2xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-medium text-[12px] lg:text-[11px] min-w-[72px] lg:min-w-0 transition"><span class="text-[18px]">↻</span><span>Rotate</span></button>
+        <button data-tool="adjust" class="tool-btn flex lg:flex-col items-center gap-1.5 lg:gap-1 px-3 lg:px-2 py-2.5 lg:py-3 rounded-xl lg:rounded-2xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-medium text-[12px] lg:text-[11px] min-w-[72px] lg:min-w-0 transition"><span class="text-[18px]">◍</span><span>Adjust</span></button>
+        <button data-tool="watermark" class="tool-btn flex lg:flex-col items-center gap-1.5 lg:gap-1 px-3 lg:px-2 py-2.5 lg:py-3 rounded-xl lg:rounded-2xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-medium text-[12px] lg:text-[11px] min-w-[72px] lg:min-w-0 transition"><span class="text-[18px]">✦</span><span>Mark</span></button>
+        <div class="hidden lg:block h-px bg-zinc-200 dark:bg-zinc-800 my-2"></div>
+        <button id="addMoreBtn" class="hidden lg:flex flex-col items-center gap-1 px-2 py-3 rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 text-[11px] font-medium text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition"><span class="w-7 h-7 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">+</span>Add</button>
+      </div>
+      <div class="hidden lg:flex flex-col gap-2 p-3 mt-auto">
+        <div class="rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 p-2.5">
+          <div class="text-[10px] font-bold tracking-widest text-zinc-400 uppercase">Files</div>
+          <div id="fileCountBadge" class="mt-1 text-[12px] font-semibold">1 image</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Canvas Workspace -->
+    <main class="flex-1 flex flex-col min-w-0 bg-[#f6f6f7] dark:bg-[#0f0f10]">
+      <!-- Top toolbar -->
+      <div class="h-[56px] border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/70 glass flex items-center justify-between px-3 md:px-4 gap-2 sticky top-0 z-10">
+        <div class="flex items-center gap-2 min-w-0">
+          <button id="backBtn" class="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center hover:bg-zinc-200 transition">←</button>
+          <div class="hidden md:flex items-center gap-2 min-w-0">
+            <div class="w-8 h-8 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 flex items-center justify-center font-bold text-[12px]">IMG</div>
+            <div class="min-w-0">
+              <div id="fileNameLabel" class="text-[13px] font-semibold truncate max-w-[200px]">image.jpg</div>
+              <div id="fileMetaLabel" class="text-[11px] text-zinc-500 font-mono -mt-0.5">—</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-1 ml-1">
+            <button id="undoBtn" class="w-8 h-8 rounded-full border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 flex items-center justify-center text-[14px] disabled:opacity-40 hover:bg-zinc-50 transition" title="Undo (Ctrl+Z)">↩</button>
+            <button id="redoBtn" class="w-8 h-8 rounded-full border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 flex items-center justify-center text-[14px] disabled:opacity-40 hover:bg-zinc-50 transition" title="Redo (Ctrl+Y)">↪</button>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="hidden md:flex items-center gap-1 p-1 rounded-full bg-zinc-100 dark:bg-zinc-800">
+            <button id="zoomOutBtn" class="w-7 h-7 rounded-full bg-white dark:bg-zinc-700 shadow-sm flex items-center justify-center text-[14px]">−</button>
+            <span id="zoomLabel" class="text-[11px] font-mono font-bold px-1 min-w-[40px] text-center">100%</span>
+            <button id="zoomInBtn" class="w-7 h-7 rounded-full bg-white dark:bg-zinc-700 shadow-sm flex items-center justify-center text-[14px]">+</button>
+          </div>
+          <button id="compareBtn" class="h-8 px-3 rounded-full border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-[12px] font-semibold flex items-center gap-1.5"><span class="w-4 h-4 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 flex items-center justify-center text-[10px]">◑</span>Compare</button>
+          <button id="resetBtn" class="h-8 px-3 rounded-full bg-zinc-100 dark:bg-zinc-800 text-[12px] font-medium hover:bg-zinc-200 transition">Reset</button>
+          <button id="downloadBtn" class="h-8 md:h-9 px-4 md:px-5 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-semibold text-[13px] flex items-center gap-1.5 shadow-lg hover:opacity-90 transition">↓ Download</button>
+        </div>
+      </div>
+
+      <!-- Canvas Area -->
+      <div id="canvasWrap" class="flex-1 relative overflow-auto flex items-center justify-center p-4 md:p-8">
+        <div id="canvasContainer" class="relative shadow-[0_20px_60px_-20px_rgba(0,0,0,.3)] rounded-[12px] overflow-hidden bg-white checker">
+          <canvas id="mainCanvas" class="block max-w-full max-h-full"></canvas>
+          <!-- Crop Overlay -->
+          <div id="cropOverlay" class="hidden absolute inset-0">
+            <div class="absolute inset-0 bg-black/50"></div>
+            <div id="cropBox" class="absolute border-2 border-white shadow-[0_0_0_1px_rgba(0,0,0,.4),0_0_0_9999px_rgba(0,0,0,.5)] cursor-move">
+              <div class="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none">
+                <div class="border-r border-b border-white/40"></div><div class="border-r border-b border-white/40"></div><div class="border-b border-white/40"></div>
+                <div class="border-r border-b border-white/40"></div><div class="border-r border-b border-white/40"></div><div class="border-b border-white/40"></div>
+                <div class="border-r border-white/40"></div><div class="border-r border-white/40"></div><div></div>
+              </div>
+              <div data-handle="nw" class="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border border-zinc-900 rounded-sm cursor-nw-resize"></div>
+              <div data-handle="ne" class="absolute -top-1.5 -right-1.5 w-3 h-3 bg-white border border-zinc-900 rounded-sm cursor-ne-resize"></div>
+              <div data-handle="sw" class="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border border-zinc-900 rounded-sm cursor-sw-resize"></div>
+              <div data-handle="se" class="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white border border-zinc-900 rounded-sm cursor-se-resize"></div>
+              <div data-handle="n" class="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border border-zinc-900 rounded-sm cursor-n-resize"></div>
+              <div data-handle="s" class="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border border-zinc-900 rounded-sm cursor-s-resize"></div>
+              <div data-handle="w" class="absolute top-1/2 -left-1.5 -translate-y-1/2 w-3 h-3 bg-white border border-zinc-900 rounded-sm cursor-w-resize"></div>
+              <div data-handle="e" class="absolute top-1/2 -right-1.5 -translate-y-1/2 w-3 h-3 bg-white border border-zinc-900 rounded-sm cursor-e-resize"></div>
+            </div>
+          </div>
+          <!-- Watermark preview handled on canvas -->
+        </div>
+        <!-- Compare slider -->
+        <div id="compareWrap" class="hidden absolute inset-0 pointer-events-none">
+          <div class="absolute inset-0 flex">
+            <div id="compareLeft" class="relative overflow-hidden border-r-2 border-white shadow-[4px_0_20px_rgba(0,0,0,.3)]" style="width:50%">
+              <canvas id="compareCanvas" class="absolute inset-0 w-full h-full object-contain"></canvas>
+              <div class="absolute top-3 left-3 px-2 py-1 rounded-full bg-black/70 text-white text-[11px] font-bold">ORIGINAL</div>
+            </div>
+            <div class="flex-1 relative"><div class="absolute top-3 right-3 px-2 py-1 rounded-full bg-white/90 text-zinc-900 text-[11px] font-bold shadow">EDITED</div></div>
+          </div>
+          <div id="compareHandle" class="absolute top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white shadow-xl border border-zinc-200 flex items-center justify-center text-zinc-700 pointer-events-auto cursor-ew-resize" style="left:50%"><span class="text-[14px]">↔</span></div>
+          <input id="compareRange" type="range" min="0" max="100" value="50" class="absolute bottom-6 left-1/2 -translate-x-1/2 w-[240px] pointer-events-auto">
+        </div>
+      </div>
+
+      <!-- Batch strip -->
+      <div id="batchStrip" class="hidden border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3">
+        <div class="flex items-center justify-between mb-2">
+          <div class="text-[12px] font-bold tracking-widest uppercase text-zinc-500">Batch • <span id="batchCount">0</span> images</div>
+          <div class="flex gap-2">
+            <button id="batchZipBtn" class="h-7 px-3 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[11px] font-semibold">Download ZIP</button>
+            <button id="clearBatchBtn" class="h-7 px-3 rounded-full bg-zinc-100 dark:bg-zinc-800 text-[11px]">Clear</button>
+          </div>
+        </div>
+        <div id="batchList" class="flex gap-2 overflow-x-auto pb-1"></div>
+      </div>
+    </main>
+
+    <!-- Controls Panel -->
+    <aside class="w-full lg:w-[360px] border-t lg:border-t-0 lg:border-l border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 lg:sticky lg:top-[64px] lg:h-[calc(100vh-64px)] lg:overflow-y-auto">
+      <div class="p-5">
+        <!-- Dynamic tool panels -->
+        <div id="panel-compress" class="tool-panel">
+          <div class="flex items-center justify-between">
+            <h3 class="font-bold text-[15px]">Compression</h3>
+            <span class="text-[11px] px-2 py-1 rounded-full bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 font-semibold">Smart</span>
+          </div>
+          <p class="mt-1 text-[12px] text-zinc-500 leading-relaxed">Reduce file size. Quality affects JPG/WebP. PNG is lossless.</p>
+
+          <div class="mt-5 space-y-5">
+            <div>
+              <div class="flex items-center justify-between mb-2"><label class="text-[12px] font-semibold">Quality</label><span id="qualityVal" class="text-[12px] font-mono font-bold px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800">80%</span></div>
+              <input id="qualityRange" type="range" min="1" max="100" value="80" class="w-full">
+              <div class="flex justify-between text-[10px] text-zinc-400 mt-1 font-medium"><span>Smaller</span><span>Best quality</span></div>
+            </div>
+
+            <div>
+              <label class="text-[12px] font-semibold">Output format</label>
+              <div class="mt-2 grid grid-cols-4 gap-1.5">
+                <button data-format="original" class="format-btn active h-16 rounded-xl border-2 border-zinc-900 dark:border-white bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 flex flex-col items-center justify-center gap-1 text-[11px] font-bold"><span class="text-[16px]">⎇</span>Original</button>
+                <button data-format="image/jpeg" class="format-btn h-16 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 flex flex-col items-center justify-center gap-1 text-[11px] font-semibold"><span class="text-[16px]">JPG</span>JPG</button>
+                <button data-format="image/webp" class="format-btn h-16 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 flex flex-col items-center justify-center gap-1 text-[11px] font-semibold"><span class="text-[16px]">WEB</span>WebP</button>
+                <button data-format="image/png" class="format-btn h-16 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 flex flex-col items-center justify-center gap-1 text-[11px] font-semibold"><span class="text-[16px]">PNG</span>PNG</button>
+              </div>
+              <div class="mt-2 text-[11px] text-zinc-500">WebP saves ~30% more than JPG. AVIF coming soon.</div>
+            </div>
+
+            <div class="rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 p-3 space-y-2">
+              <div class="flex justify-between text-[12px]"><span class="text-zinc-500">Original</span><span id="origSizeLabel" class="font-mono font-semibold">—</span></div>
+              <div class="flex justify-between text-[12px]"><span class="text-zinc-500">Compressed</span><span id="compSizeLabel" class="font-mono font-semibold text-emerald-600">—</span></div>
+              <div class="h-2 rounded-full bg-zinc-200 dark:bg-zinc-700 overflow-hidden"><div id="savingsBar" class="h-full bg-gradient-to-r from-emerald-500 to-sky-500 transition-all" style="width:0%"></div></div>
+              <div id="savingsLabel" class="text-[11px] font-bold text-emerald-600">— saved</div>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <input id="keepExif" type="checkbox" class="rounded"><label for="keepExif" class="text-[12px]">Keep metadata (EXIF)</label>
+            </div>
+          </div>
+        </div>
+
+        <div id="panel-resize" class="tool-panel hidden">
+          <h3 class="font-bold text-[15px]">Resize</h3>
+          <p class="mt-1 text-[12px] text-zinc-500">Change dimensions. Presets keep aspect.</p>
+
+          <div class="mt-5 space-y-5">
+            <div class="grid grid-cols-2 gap-3">
+              <div><label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">Width</label><div class="mt-1 flex"><input id="resizeW" type="number" class="w-full h-10 px-3 rounded-l-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-[13px] font-mono"><span class="h-10 px-2.5 flex items-center rounded-r-xl border border-l-0 border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-[11px]">px</span></div></div>
+              <div><label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">Height</label><div class="mt-1 flex"><input id="resizeH" type="number" class="w-full h-10 px-3 rounded-l-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-[13px] font-mono"><span class="h-10 px-2.5 flex items-center rounded-r-xl border border-l-0 border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-[11px]">px</span></div></div>
+            </div>
+            <label class="flex items-center gap-2 text-[12px]"><input id="lockAspect" type="checkbox" checked class="rounded"> Lock aspect ratio</label>
+
+            <div>
+              <label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">Scale</label>
+              <div class="mt-2 flex items-center gap-3"><input id="scaleRange" type="range" min="10" max="200" value="100" class="flex-1"><span id="scaleVal" class="text-[12px] font-mono font-bold min-w-[40px]">100%</span></div>
+            </div>
+
+            <div>
+              <label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">Presets</label>
+              <div class="mt-2 grid grid-cols-2 gap-2">
+                <button data-preset="1920x1080" class="preset-btn h-10 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-[11px] font-medium hover:bg-zinc-100 transition">1920×1080 FHD</button>
+                <button data-preset="1280x720" class="preset-btn h-10 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-[11px] font-medium">1280×720 HD</button>
+                <button data-preset="1080x1080" class="preset-btn h-10 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-[11px] font-medium">1080×1080 IG</button>
+                <button data-preset="1200x628" class="preset-btn h-10 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-[11px] font-medium">1200×628 OG</button>
+                <button data-preset="1080x1920" class="preset-btn h-10 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-[11px] font-medium">1080×1920 Story</button>
+                <button data-preset="800x600" class="preset-btn h-10 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-[11px] font-medium">800×600</button>
+              </div>
+            </div>
+
+            <div>
+              <label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">Fit mode</label>
+              <div class="mt-2 grid grid-cols-3 gap-1 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-800">
+                <button data-fit="cover" class="fit-btn active h-8 rounded-lg bg-white dark:bg-zinc-700 shadow-sm text-[11px] font-semibold">Cover</button>
+                <button data-fit="contain" class="fit-btn h-8 rounded-lg text-[11px] font-medium text-zinc-500">Contain</button>
+                <button data-fit="stretch" class="fit-btn h-8 rounded-lg text-[11px] font-medium text-zinc-500">Stretch</button>
+              </div>
+            </div>
+
+            <button id="applyResizeBtn" class="w-full h-11 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-semibold text-[13px]">Apply Resize</button>
+          </div>
+        </div>
+
+        <div id="panel-convert" class="tool-panel hidden">
+          <h3 class="font-bold text-[15px]">Convert Format</h3>
+          <p class="mt-1 text-[12px] text-zinc-500">Switch between JPG, PNG, WebP. Batch supported.</p>
+          <div class="mt-5 space-y-5">
+            <div class="grid grid-cols-1 gap-2">
+              <button data-cformat="image/jpeg" class="cformat-btn active flex items-center gap-3 p-3 rounded-xl border-2 border-zinc-900 dark:border-white bg-zinc-50 dark:bg-zinc-800 text-left"><div class="w-10 h-10 rounded-lg bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center font-bold text-amber-700 dark:text-amber-300 text-[12px]">JPG</div><div><div class="font-semibold text-[13px]">JPEG</div><div class="text-[11px] text-zinc-500">Best for photos, smallest size</div></div><div class="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border">Lossy</div></button>
+              <button data-cformat="image/png" class="cformat-btn flex items-center gap-3 p-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800/50 text-left hover:bg-zinc-50 transition"><div class="w-10 h-10 rounded-lg bg-sky-100 dark:bg-sky-900/50 flex items-center justify-center font-bold text-sky-700 dark:text-sky-300 text-[12px]">PNG</div><div><div class="font-semibold text-[13px]">PNG</div><div class="text-[11px] text-zinc-500">Transparency, lossless</div></div><div class="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-600 border">Lossless</div></button>
+              <button data-cformat="image/webp" class="cformat-btn flex items-center gap-3 p-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800/50 text-left hover:bg-zinc-50 transition"><div class="w-10 h-10 rounded-lg bg-violet-100 dark:bg-violet-900/50 flex items-center justify-center font-bold text-violet-700 dark:text-violet-300 text-[11px]">WEBP</div><div><div class="font-semibold text-[13px]">WebP</div><div class="text-[11px] text-zinc-500">Modern, 30% smaller than JPG</div></div><div class="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 border">Recommended</div></button>
+            </div>
+            <div id="convertQualityWrap">
+              <div class="flex justify-between mb-2"><label class="text-[12px] font-semibold">Quality</label><span id="cQualityVal" class="text-[12px] font-mono font-bold">85%</span></div>
+              <input id="cQualityRange" type="range" min="1" max="100" value="85" class="w-full">
+            </div>
+            <div class="rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3 text-[11px] leading-relaxed text-amber-800 dark:text-amber-200">⚠️ JPG does not support transparency. Transparent areas will become white.</div>
+            <button id="applyConvertBtn" class="w-full h-11 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-semibold text-[13px]">Convert & Download</button>
+          </div>
+        </div>
+
+        <div id="panel-crop" class="tool-panel hidden">
+          <h3 class="font-bold text-[15px]">Crop Image</h3>
+          <p class="mt-1 text-[12px] text-zinc-500">Drag the box. Use presets for perfect ratio.</p>
+          <div class="mt-5 space-y-5">
+            <div>
+              <label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">Aspect Ratio</label>
+              <div class="mt-2 grid grid-cols-3 gap-1.5">
+                <button data-ratio="free" class="ratio-btn active h-9 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[11px] font-semibold">Free</button>
+                <button data-ratio="1:1" class="ratio-btn h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-[11px] font-medium">1:1</button>
+                <button data-ratio="4:3" class="ratio-btn h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-[11px] font-medium">4:3</button>
+                <button data-ratio="16:9" class="ratio-btn h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-[11px] font-medium">16:9</button>
+                <button data-ratio="3:2" class="ratio-btn h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-[11px] font-medium">3:2</button>
+                <button data-ratio="9:16" class="ratio-btn h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-[11px] font-medium">9:16</button>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3 text-[11px] font-mono">
+              <div class="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border">X: <span id="cropX">0</span> Y: <span id="cropY">0</span></div>
+              <div class="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border">W: <span id="cropW">0</span> H: <span id="cropH">0</span></div>
+            </div>
+            <div class="flex gap-2">
+              <button id="cropCancelBtn" class="flex-1 h-10 rounded-full border border-zinc-200 dark:border-zinc-700 text-[12px] font-semibold">Cancel</button>
+              <button id="cropApplyBtn" class="flex-1 h-10 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[12px] font-semibold">Apply Crop</button>
+            </div>
+            <div class="text-[11px] text-zinc-500">Tip: Hold Shift to lock ratio while dragging handles.</div>
+          </div>
+        </div>
+
+        <div id="panel-rotate" class="tool-panel hidden">
+          <h3 class="font-bold text-[15px]">Rotate & Flip</h3>
+          <div class="mt-5 space-y-5">
+            <div class="grid grid-cols-2 gap-2">
+              <button id="rotLeftBtn" class="h-12 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 flex flex-col items-center justify-center gap-0.5 hover:bg-zinc-50 transition"><span class="text-[18px]">↺</span><span class="text-[11px] font-medium">Rotate Left 90°</span></button>
+              <button id="rotRightBtn" class="h-12 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 flex flex-col items-center justify-center gap-0.5 hover:bg-zinc-50 transition"><span class="text-[18px]">↻</span><span class="text-[11px] font-medium">Rotate Right 90°</span></button>
+              <button id="flipHBtn" class="h-12 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 flex flex-col items-center justify-center gap-0.5 hover:bg-zinc-50 transition"><span class="text-[18px]">⇔</span><span class="text-[11px] font-medium">Flip Horizontal</span></button>
+              <button id="flipVBtn" class="h-12 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 flex flex-col items-center justify-center gap-0.5 hover:bg-zinc-50 transition"><span class="text-[18px]">⇕</span><span class="text-[11px] font-medium">Flip Vertical</span></button>
+            </div>
+            <div>
+              <div class="flex justify-between mb-2"><label class="text-[12px] font-semibold">Straighten</label><span id="straightenVal" class="text-[12px] font-mono font-bold">0°</span></div>
+              <input id="straightenRange" type="range" min="-45" max="45" value="0" class="w-full">
+            </div>
+            <button id="applyRotateBtn" class="w-full h-11 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-semibold text-[13px]">Apply</button>
+          </div>
+        </div>
+
+        <div id="panel-adjust" class="tool-panel hidden">
+          <h3 class="font-bold text-[15px]">Adjust & Filters</h3>
+          <div class="mt-5 space-y-4">
+            <div><div class="flex justify-between mb-1"><label class="text-[11px] font-semibold">Brightness</label><span id="bVal" class="text-[11px] font-mono">100%</span></div><input data-filter="brightness" type="range" min="0" max="200" value="100" class="w-full filter-range"></div>
+            <div><div class="flex justify-between mb-1"><label class="text-[11px] font-semibold">Contrast</label><span id="cVal" class="text-[11px] font-mono">100%</span></div><input data-filter="contrast" type="range" min="0" max="200" value="100" class="w-full filter-range"></div>
+            <div><div class="flex justify-between mb-1"><label class="text-[11px] font-semibold">Saturation</label><span id="sVal" class="text-[11px] font-mono">100%</span></div><input data-filter="saturate" type="range" min="0" max="200" value="100" class="w-full filter-range"></div>
+            <div><div class="flex justify-between mb-1"><label class="text-[11px] font-semibold">Blur</label><span id="blVal" class="text-[11px] font-mono">0px</span></div><input data-filter="blur" type="range" min="0" max="10" value="0" step="0.1" class="w-full filter-range"></div>
+            <div><div class="flex justify-between mb-1"><label class="text-[11px] font-semibold">Hue Rotate</label><span id="hVal" class="text-[11px] font-mono">0°</span></div><input data-filter="hue" type="range" min="0" max="360" value="0" class="w-full filter-range"></div>
+            <div class="grid grid-cols-2 gap-2 pt-2">
+              <label class="flex items-center gap-2 p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-[12px] cursor-pointer"><input data-filter="grayscale" type="checkbox" class="filter-check"> Grayscale</label>
+              <label class="flex items-center gap-2 p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-[12px] cursor-pointer"><input data-filter="sepia" type="checkbox" class="filter-check"> Sepia</label>
+              <label class="flex items-center gap-2 p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-[12px] cursor-pointer"><input data-filter="invert" type="checkbox" class="filter-check"> Invert</label>
+              <button id="clearFiltersBtn" class="p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-[12px] font-medium">Clear</button>
+            </div>
+            <button id="applyFiltersBtn" class="w-full h-11 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-semibold text-[13px]">Apply Filters</button>
+          </div>
+        </div>
+
+        <div id="panel-watermark" class="tool-panel hidden">
+          <h3 class="font-bold text-[15px]">Watermark</h3>
+          <div class="mt-5 space-y-5">
+            <div><label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">Text</label><input id="wmText" type="text" placeholder="© Your Brand" class="mt-1 w-full h-10 px-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-[13px]"></div>
+            <div class="grid grid-cols-2 gap-3">
+              <div><label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">Font Size</label><input id="wmSize" type="range" min="10" max="120" value="36" class="w-full mt-2"><div class="text-[11px] font-mono mt-1"><span id="wmSizeVal">36</span>px</div></div>
+              <div><label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">Opacity</label><input id="wmOpacity" type="range" min="10" max="100" value="60" class="w-full mt-2"><div class="text-[11px] font-mono mt-1"><span id="wmOpacityVal">60</span>%</div></div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div><label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">Color</label><input id="wmColor" type="color" value="#ffffff" class="mt-1 w-full h-10 rounded-xl border border-zinc-200 dark:border-zinc-700 p-1 bg-white dark:bg-zinc-800"></div>
+              <div><label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">Position</label>
+                <div class="mt-1 grid grid-cols-3 gap-1">
+                  <button data-pos="tl" class="wm-pos h-7 rounded-lg border bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[10px]">TL</button>
+                  <button data-pos="tc" class="wm-pos h-7 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-[10px]">TC</button>
+                  <button data-pos="tr" class="wm-pos h-7 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-[10px]">TR</button>
+                  <button data-pos="ml" class="wm-pos h-7 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-[10px]">ML</button>
+                  <button data-pos="mc" class="wm-pos h-7 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-[10px]">MC</button>
+                  <button data-pos="mr" class="wm-pos h-7 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-[10px]">MR</button>
+                  <button data-pos="bl" class="wm-pos h-7 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-[10px]">BL</button>
+                  <button data-pos="bc" class="wm-pos h-7 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-[10px]">BC</button>
+                  <button data-pos="br" class="wm-pos active h-7 rounded-lg border bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[10px]">BR</button>
+                </div>
+              </div>
+            </div>
+            <button id="applyWmBtn" class="w-full h-11 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-semibold text-[13px]">Apply Watermark</button>
+          </div>
+        </div>
+
+        <!-- Info footer in panel -->
+        <div class="mt-8 pt-6 border-t border-zinc-200 dark:border-zinc-800">
+          <div class="rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 p-4">
+            <div class="text-[13px] font-bold">💡 Pro Tip</div>
+            <div class="mt-1 text-[11px] leading-relaxed opacity-80">Press <span class="px-1 py-0.5 rounded bg-white/20 font-mono">C</span> to compare, <span class="px-1 py-0.5 rounded bg-white/20 font-mono">Ctrl+Z</span> undo, <span class="px-1 py-0.5 rounded bg-white/20 font-mono">V</span> paste image from clipboard.</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<!-- Footer for empty state -->
+<footer id="mainFooter" class="border-t border-zinc-200 dark:border-zinc-800 mt-12 bg-white dark:bg-zinc-900">
+  <div class="max-w-[1600px] mx-auto px-4 md:px-6 py-12">
+    <div class="grid md:grid-cols-3 gap-8 text-[13px]">
+      <div><div class="font-bold text-[14px]">Why ImgTool?</div><div class="mt-2 text-zinc-500 leading-relaxed">We process images locally using Canvas & WebCodecs. No server, no tracking, no limits. Open source, free forever. Perfect for designers, photographers, developers.</div></div>
+      <div><div class="font-bold text-[14px]">Tools</div><ul class="mt-2 space-y-1 text-zinc-500"><li>• Compress JPG/PNG/WebP</li><li>• Resize with presets</li><li>• Convert formats batch</li><li>• Crop, Rotate, Filters</li><li>• Watermark & more</li></ul></div>
+      <div><div class="font-bold text-[14px]">Built for speed</div><div class="mt-2 text-zinc-500 leading-relaxed">Tailwind UI, vanilla JS, JSZip for batch ZIP. Works offline after first load. Add to home screen for native app feel.</div></div>
+    </div>
+    <div class="mt-8 pt-8 border-t border-zinc-100 dark:border-zinc-800 flex flex-col md:flex-row justify-between gap-2 text-[11px] text-zinc-400"><span>© 2026 ImgTool Studio — Built with ♥ for creators</span><span class="font-mono">v2.0 • client-side • no cookies</span></div>
+  </div>
+</footer>
+
+<script>
+/* ================== State & Elements ================== */
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+const mainCanvas = $('#mainCanvas');
+const ctx = mainCanvas.getContext('2d', { willReadFrequently:true });
+const compareCanvas = $('#compareCanvas');
+const cCtx = compareCanvas.getContext('2d');
+const dropzone = $('#dropzone');
+const fileInput = $('#fileInput');
+const emptyState = $('#emptyState');
+const appState = $('#appState');
+const mainFooter = $('#mainFooter');
+
+let state = {
+  originalImg: null,
+  originalFile: null,
+  originalDataUrl: null,
+  originalWidth: 0,
+  originalHeight: 0,
+  history: [],
+  historyIndex: -1,
+  tool: 'compress',
+  format: 'original',
+  cFormat: 'image/jpeg',
+  quality: 80,
+  cQuality: 85,
+  zoom: 100,
+  filters: { brightness:100, contrast:100, saturate:100, blur:0, hue:0, grayscale:false, sepia:false, invert:false },
+  watermark: { text:'', size:36, opacity:60, color:'#ffffff', pos:'br' },
+  crop: { x:0.1, y:0.1, w:0.8, h:0.8, ratio:'free' },
+  rotate: { angle:0, flipH:false, flipV:false, straighten:0 },
+  batch: [],
+  compare: false
+};
+
+function pushHistory() {
+  // save current canvas as dataUrl (limit history 20)
+  try {
+    const data = mainCanvas.toDataURL('image/png');
+    state.history = state.history.slice(0, state.historyIndex+1);
+    state.history.push(data);
+    if(state.history.length>20) state.history.shift();
+    else state.historyIndex++;
+    if(state.history.length>20) state.historyIndex=19;
+    updateUndoRedo();
+  } catch(e){ console.warn(e) }
+}
+function updateUndoRedo(){
+  $('#undoBtn').disabled = state.historyIndex<=0;
+  $('#redoBtn').disabled = state.historyIndex>=state.history.length-1;
+}
+function restoreHistory(idx){
+  if(idx<0||idx>=state.history.length) return;
+  const img = new Image();
+  img.onload = ()=>{ mainCanvas.width=img.width; mainCanvas.height=img.height; ctx.clearRect(0,0,img.width,img.height); ctx.drawImage(img,0,0); state.historyIndex=idx; updateUndoRedo(); refreshCanvasContainer(); estimateSize(); };
+  img.src = state.history[idx];
+}
+
+/* ================== Image Loading ================== */
+async function loadFile(file){
+  if(!file.type.startsWith('image/')) return alert('Please drop an image file');
+  state.originalFile = file;
+  state.originalDataUrl = await fileToDataUrl(file);
+  const img = new Image();
+  img.onload = ()=>{
+    state.originalImg = img;
+    state.originalWidth = img.width;
+    state.originalHeight = img.height;
+    mainCanvas.width = img.width;
+    mainCanvas.height = img.height;
+    ctx.clearRect(0,0,img.width,img.height);
+    ctx.drawImage(img,0,0);
+    // reset filters etc
+    state.filters = { brightness:100, contrast:100, saturate:100, blur:0, hue:0, grayscale:false, sepia:false, invert:false };
+    state.rotate = { angle:0, flipH:false, flipV:false, straighten:0 };
+    state.crop = { x:0.1, y:0.1, w:0.8, h:0.8, ratio: state.crop.ratio };
+    state.history=[]; state.historyIndex=-1;
+    pushHistory();
+    showApp();
+    updateMeta();
+    refreshCanvasContainer();
+    estimateSize();
+    updateResizeInputs();
+    // batch
+    if(!state.batch.find(b=>b.name===file.name && b.size===file.size)){
+      state.batch.push({ file, img, name:file.name, size:file.size, dataUrl:state.originalDataUrl });
+      renderBatch();
+    }
+    // compare canvas
+    compareCanvas.width = img.width;
+    compareCanvas.height = img.height;
+    cCtx.drawImage(img,0,0);
+  };
+  img.src = state.originalDataUrl;
+}
+function fileToDataUrl(file){ return new Promise(r=>{ const fr=new FileReader(); fr.onload=e=>r(e.target.result); fr.readAsDataURL(file); }); }
+function showApp(){
+  emptyState.classList.add('hidden');
+  mainFooter.classList.add('hidden');
+  appState.classList.remove('hidden');
+}
+function showEmpty(){
+  emptyState.classList.remove('hidden');
+  mainFooter.classList.remove('hidden');
+  appState.classList.add('hidden');
+  state.batch=[]; renderBatch();
+}
+function updateMeta(){
+  if(!state.originalFile) return;
+  $('#fileNameLabel').textContent = state.originalFile.name;
+  $('#fileMetaLabel').textContent = `${state.originalWidth} × ${state.originalHeight} • ${(state.originalFile.size/1024).toFixed(1)} KB • ${state.originalFile.type||'image'}`;
+  $('#fileCountBadge').textContent = `${state.batch.length} image${state.batch.length>1?'s':''}`;
+  $('#origSizeLabel').textContent = formatBytes(state.originalFile.size);
+}
+function formatBytes(b){ if(b<1024) return b+' B'; if(b<1024*1024) return (b/1024).toFixed(1)+' KB'; return (b/1024/1024).toFixed(2)+' MB'; }
+function refreshCanvasContainer(){
+  const cont = $('#canvasContainer');
+  const wrap = $('#canvasWrap');
+  // scale to fit
+  const maxW = wrap.clientWidth - 64;
+  const maxH = wrap.clientHeight - 64;
+  const ratio = Math.min(maxW / mainCanvas.width, maxH / mainCanvas.height, 1);
+  cont.style.width = (mainCanvas.width*ratio)+'px';
+  cont.style.height = (mainCanvas.height*ratio)+'px';
+  mainCanvas.style.width = '100%';
+  mainCanvas.style.height = '100%';
+  // compare canvas sync
+  compareCanvas.style.width='100%'; compareCanvas.style.height='100%';
+}
+window.addEventListener('resize', refreshCanvasContainer);
+
+/* ================== Drop & Paste ================== */
+dropzone.addEventListener('click', ()=> fileInput.click());
+dropzone.addEventListener('dragover', e=>{ e.preventDefault(); dropzone.classList.add('border-sky-500','bg-sky-50/50'); });
+dropzone.addEventListener('dragleave', ()=> dropzone.classList.remove('border-sky-500','bg-sky-50/50'));
+dropzone.addEventListener('drop', e=>{ e.preventDefault(); dropzone.classList.remove('border-sky-500','bg-sky-50/50'); const files = [...e.dataTransfer.files].filter(f=>f.type.startsWith('image/')); if(files.length) { files.forEach(loadFile); } });
+fileInput.addEventListener('change', e=>{ [...e.target.files].forEach(loadFile); });
+document.addEventListener('paste', e=>{
+  const items = [...(e.clipboardData?.items||[])];
+  const imgItem = items.find(i=>i.type.startsWith('image/'));
+  if(imgItem){ const file = imgItem.getAsFile(); if(file) loadFile(file); }
+});
+$('#pasteBtn').addEventListener('click', async()=>{
+  try{ const items = await navigator.clipboard.read(); for(const it of items){ for(const t of it.types){ if(t.startsWith('image/')){ const blob = await it.getType(t); loadFile(new File([blob], 'pasted.png', {type:t})); } } } }catch{ alert('Clipboard read failed. Try Ctrl+V directly.'); }
+});
+$$('[data-sample]').forEach(btn=> btn.addEventListener('click', async()=>{
+  const url = btn.dataset.sample;
+  try{
+    const res = await fetch(url); const blob = await res.blob(); loadFile(new File([blob], 'sample.jpg', {type:blob.type}));
+  }catch(e){ window.open(url,'_blank'); }
+}));
+
+/* ================== Tools Switching ================== */
+$$('.tool-btn').forEach(b=> b.addEventListener('click', ()=>{
+  $$('.tool-btn').forEach(x=> x.className='tool-btn flex lg:flex-col items-center gap-1.5 lg:gap-1 px-3 lg:px-2 py-2.5 lg:py-3 rounded-xl lg:rounded-2xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-medium text-[12px] lg:text-[11px] min-w-[72px] lg:min-w-0 transition');
+  b.className='tool-btn active flex lg:flex-col items-center gap-1.5 lg:gap-1 px-3 lg:px-2 py-2.5 lg:py-3 rounded-xl lg:rounded-2xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-semibold text-[12px] lg:text-[11px] min-w-[72px] lg:min-w-0 transition';
+  state.tool = b.dataset.tool;
+  $$('.tool-panel').forEach(p=> p.classList.add('hidden'));
+  $(`#panel-${state.tool}`).classList.remove('hidden');
+  if(state.tool==='crop') enableCrop(); else disableCrop();
+}));
+$('#addMoreBtn').addEventListener('click', ()=> fileInput.click());
+$('#backBtn').addEventListener('click', showEmpty);
+
+/* ================== Compression ================== */
+$('#qualityRange').addEventListener('input', e=>{ state.quality = +e.target.value; $('#qualityVal').textContent = state.quality+'%'; estimateSize(); });
+$$('.format-btn').forEach(b=> b.addEventListener('click', ()=>{
+  $$('.format-btn').forEach(x=> x.className='format-btn h-16 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 flex flex-col items-center justify-center gap-1 text-[11px] font-semibold');
+  b.className='format-btn active h-16 rounded-xl border-2 border-zinc-900 dark:border-white bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 flex flex-col items-center justify-center gap-1 text-[11px] font-bold';
+  state.format = b.dataset.format;
+  estimateSize();
+}));
+function estimateSize(){
+  if(!state.originalImg) return;
+  const fmt = state.format==='original' ? (state.originalFile?.type||'image/jpeg') : state.format;
+  const q = state.quality/100;
+  mainCanvas.toBlob(blob=>{
+    if(!blob) return;
+    $('#compSizeLabel').textContent = formatBytes(blob.size);
+    const orig = state.originalFile?.size || blob.size;
+    const saved = orig>0 ? Math.max(0, ((orig-blob.size)/orig*100)) : 0;
+    $('#savingsBar').style.width = saved+'%';
+    $('#savingsLabel').textContent = saved.toFixed(1)+'% saved • '+fmt.split('/')[1].toUpperCase();
+  }, fmt, fmt==='image/png'?undefined:q);
+}
+
+/* ================== Resize ================== */
+function updateResizeInputs(){
+  if(!state.originalImg) return;
+  $('#resizeW').value = mainCanvas.width;
+  $('#resizeH').value = mainCanvas.height;
+  $('#scaleVal').textContent = '100%';
+  $('#scaleRange').value = 100;
+}
+$('#resizeW').addEventListener('input', e=>{
+  if($('#lockAspect').checked && state.originalWidth){
+    const ratio = state.originalHeight/state.originalWidth;
+    $('#resizeH').value = Math.round(+e.target.value * ratio);
+  }
+});
+$('#resizeH').addEventListener('input', e=>{
+  if($('#lockAspect').checked && state.originalHeight){
+    const ratio = state.originalWidth/state.originalHeight;
+    $('#resizeW').value = Math.round(+e.target.value * ratio);
+  }
+});
+$('#scaleRange').addEventListener('input', e=>{
+  const pct = +e.target.value;
+  $('#scaleVal').textContent = pct+'%';
+  if(!state.originalImg) return;
+  const w = Math.round(state.originalWidth * pct/100);
+  const h = Math.round(state.originalHeight * pct/100);
+  $('#resizeW').value = w; $('#resizeH').value = h;
+});
+$$('.preset-btn').forEach(b=> b.addEventListener('click', ()=>{
+  const [w,h] = b.dataset.preset.split('x').map(Number);
+  $('#resizeW').value = w; $('#resizeH').value = h;
+  $$('.preset-btn').forEach(x=> x.classList.remove('bg-zinc-900','text-white','dark:bg-white','dark:text-zinc-900'));
+  b.classList.add('bg-zinc-900','text-white','dark:bg-white','dark:text-zinc-900');
+}));
+let fitMode='cover';
+$$('.fit-btn').forEach(b=> b.addEventListener('click', ()=>{
+  $$('.fit-btn').forEach(x=> x.className='fit-btn h-8 rounded-lg text-[11px] font-medium text-zinc-500');
+  b.className='fit-btn active h-8 rounded-lg bg-white dark:bg-zinc-700 shadow-sm text-[11px] font-semibold';
+  fitMode = b.dataset.fit;
+}));
+$('#applyResizeBtn').addEventListener('click', ()=>{
+  const w = parseInt($('#resizeW').value), h = parseInt($('#resizeH').value);
+  if(!w||!h) return alert('Invalid dimensions');
+  const tmp = document.createElement('canvas');
+  tmp.width=w; tmp.height=h;
+  const tCtx = tmp.getContext('2d');
+  // fit logic
+  if(fitMode==='stretch'){
+    tCtx.drawImage(mainCanvas,0,0,w,h);
+  }else if(fitMode==='contain'){
+    const ratio = Math.min(w/mainCanvas.width, h/mainCanvas.height);
+    const nw = mainCanvas.width*ratio, nh = mainCanvas.height*ratio;
+    const x = (w-nw)/2, y=(h-nh)/2;
+    tCtx.fillStyle='#ffffff'; tCtx.fillRect(0,0,w,h);
+    tCtx.drawImage(mainCanvas,x,y,nw,nh);
+  }else{ // cover
+    const ratio = Math.max(w/mainCanvas.width, h/mainCanvas.height);
+    const nw = mainCanvas.width*ratio, nh = mainCanvas.height*ratio;
+    const x = (w-nw)/2, y=(h-nh)/2;
+    tCtx.drawImage(mainCanvas,x,y,nw,nh);
+  }
+  mainCanvas.width=w; mainCanvas.height=h;
+  ctx.clearRect(0,0,w,h);
+  ctx.drawImage(tmp,0,0);
+  pushHistory(); refreshCanvasContainer(); estimateSize();
+});
+
+/* ================== Convert ================== */
+$$('.cformat-btn').forEach(b=> b.addEventListener('click', ()=>{
+  $$('.cformat-btn').forEach(x=>{ x.className='cformat-btn flex items-center gap-3 p-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800/50 text-left hover:bg-zinc-50 transition'; });
+  b.className='cformat-btn active flex items-center gap-3 p-3 rounded-xl border-2 border-zinc-900 dark:border-white bg-zinc-50 dark:bg-zinc-800 text-left';
+  state.cFormat = b.dataset.cformat;
+  $('#convertQualityWrap').classList.toggle('hidden', state.cFormat==='image/png');
+}));
+$('#cQualityRange').addEventListener('input', e=>{ state.cQuality=+e.target.value; $('#cQualityVal').textContent=state.cQuality+'%'; });
+$('#applyConvertBtn').addEventListener('click', ()=>{
+  downloadCanvas(state.cFormat, state.cFormat==='image/png'?undefined:state.cQuality/100);
+});
+
+/* ================== Crop ================== */
+let cropDragging=null, cropResizing=null, cropStart={};
+function enableCrop(){
+  $('#cropOverlay').classList.remove('hidden');
+  updateCropBox();
+}
+function disableCrop(){ $('#cropOverlay').classList.remove('hidden'); $('#cropOverlay').classList.add('hidden'); }
+function updateCropBox(){
+  const cont = $('#canvasContainer');
+  const box = $('#cropBox');
+  const cw = cont.clientWidth, ch = cont.clientHeight;
+  // crop is in 0-1 relative to canvas container
+  box.style.left = (state.crop.x*cw)+'px';
+  box.style.top = (state.crop.y*ch)+'px';
+  box.style.width = (state.crop.w*cw)+'px';
+  box.style.height = (state.crop.h*ch)+'px';
+  $('#cropX').textContent = Math.round(state.crop.x*mainCanvas.width);
+  $('#cropY').textContent = Math.round(state.crop.y*mainCanvas.height);
+  $('#cropW').textContent = Math.round(state.crop.w*mainCanvas.width);
+  $('#cropH').textContent = Math.round(state.crop.h*mainCanvas.height);
+}
+function setCropRatio(r){
+  state.crop.ratio=r;
+  if(r==='free') return;
+  const [rw,rh] = r.split(':').map(Number);
+  const ratio = rw/rh;
+  // adjust height based on width keeping center
+  const currentW = state.crop.w;
+  let newH = currentW / ratio * (mainCanvas.width/mainCanvas.height); // approximate because container ratio may differ, but we work in normalized canvas space
+  // Better: compute in canvas pixels then normalize
+  const canvasRatio = mainCanvas.width / mainCanvas.height;
+  // We want crop box in normalized container which maps to canvas: but container may have letterbox? Actually container is sized to canvas ratio, so normalized maps directly.
+  newH = currentW / ratio;
+  if(state.crop.y+newH>1) newH = 1-state.crop.y;
+  state.crop.h = newH;
+  updateCropBox();
+}
+$$('.ratio-btn').forEach(b=> b.addEventListener('click', ()=>{
+  $$('.ratio-btn').forEach(x=> x.className='ratio-btn h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-[11px] font-medium');
+  b.className='ratio-btn active h-9 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[11px] font-semibold';
+  setCropRatio(b.dataset.ratio);
+}));
+const cropBox = $('#cropBox');
+cropBox.addEventListener('mousedown', e=>{
+  if(e.target.dataset.handle){ cropResizing=e.target.dataset.handle; } else { cropDragging=true; }
+  cropStart={ x:e.clientX, y:e.clientY, crop:{...state.crop} };
+  e.preventDefault();
+});
+window.addEventListener('mousemove', e=>{
+  if(!cropDragging && !cropResizing) return;
+  const cont = $('#canvasContainer');
+  const cw = cont.clientWidth, ch = cont.clientHeight;
+  const dx = (e.clientX-cropStart.x)/cw;
+  const dy = (e.clientY-cropStart.y)/ch;
+  if(cropDragging){
+    let nx = cropStart.crop.x + dx;
+    let ny = cropStart.crop.y + dy;
+    nx = Math.max(0, Math.min(1-state.crop.w, nx));
+    ny = Math.max(0, Math.min(1-state.crop.h, ny));
+    state.crop.x = nx; state.crop.y = ny;
+  }else if(cropResizing){
+    let {x,y,w,h} = cropStart.crop;
+    const handle = cropResizing;
+    if(handle.includes('e')) w = Math.max(0.05, w+dx);
+    if(handle.includes('s')) h = Math.max(0.05, h+dy);
+    if(handle.includes('w')){ const newW = Math.max(0.05, w-dx); x = x + (w-newW); w=newW; }
+    if(handle.includes('n')){ const newH = Math.max(0.05, h-dy); y = y + (h-newH); h=newH; }
+    // clamp
+    if(x<0){ w+=x; x=0; } if(y<0){ h+=y; y=0; } if(x+w>1) w=1-x; if(y+h>1) h=1-y;
+    // ratio lock
+    if(state.crop.ratio!=='free'){
+      const [rw,rh] = state.crop.ratio.split(':').map(Number);
+      const ratio = rw/rh;
+      if(handle==='e'||handle==='w'||handle==='se'||handle==='ne'||handle==='sw'||handle==='nw'){
+        // adjust h based on w
+        const targetH = w / ratio;
+        if(handle.includes('n')) y = y + (h-targetH);
+        h = targetH;
+      }else{
+        const targetW = h * ratio;
+        if(handle.includes('w')) x = x + (w-targetW);
+        w = targetW;
+      }
+    }
+    state.crop.x=x; state.crop.y=y; state.crop.w=w; state.crop.h=h;
+  }
+  updateCropBox();
+});
+window.addEventListener('mouseup', ()=>{ cropDragging=null; cropResizing=null; });
+$('#cropApplyBtn').addEventListener('click', ()=>{
+  const sx = Math.round(state.crop.x*mainCanvas.width);
+  const sy = Math.round(state.crop.y*mainCanvas.height);
+  const sw = Math.round(state.crop.w*mainCanvas.width);
+  const sh = Math.round(state.crop.h*mainCanvas.height);
+  if(sw<1||sh<1) return;
+  const tmp = document.createElement('canvas');
+  tmp.width=sw; tmp.height=sh;
+  tmp.getContext('2d').drawImage(mainCanvas, sx,sy,sw,sh, 0,0,sw,sh);
+  mainCanvas.width=sw; mainCanvas.height=sh;
+  ctx.drawImage(tmp,0,0);
+  state.crop={x:0.1,y:0.1,w:0.8,h:0.8,ratio:state.crop.ratio};
+  updateCropBox(); pushHistory(); refreshCanvasContainer(); estimateSize();
+});
+$('#cropCancelBtn').addEventListener('click', ()=>{ state.crop={x:0.1,y:0.1,w:0.8,h:0.8,ratio:state.crop.ratio}; updateCropBox(); });
+
+/* ================== Rotate ================== */
+$('#rotLeftBtn').addEventListener('click', ()=> rotateCanvas(-90));
+$('#rotRightBtn').addEventListener('click', ()=> rotateCanvas(90));
+$('#flipHBtn').addEventListener('click', ()=> flipCanvas('h'));
+$('#flipVBtn').addEventListener('click', ()=> flipCanvas('v'));
+$('#straightenRange').addEventListener('input', e=>{ $('#straightenVal').textContent=e.target.value+'°'; state.rotate.straighten=+e.target.value; applyStraightenPreview(); });
+function rotateCanvas(deg){
+  state.rotate.angle = (state.rotate.angle+deg)%360;
+  const tmp = document.createElement('canvas');
+  const rad = deg*Math.PI/180;
+  const w = mainCanvas.width, h = mainCanvas.height;
+  if(Math.abs(deg)%180===90){ tmp.width=h; tmp.height=w; } else { tmp.width=w; tmp.height=h; }
+  const tCtx = tmp.getContext('2d');
+  tCtx.translate(tmp.width/2, tmp.height/2);
+  tCtx.rotate(rad);
+  tCtx.drawImage(mainCanvas, -w/2, -h/2);
+  mainCanvas.width=tmp.width; mainCanvas.height=tmp.height;
+  ctx.clearRect(0,0,tmp.width,tmp.height);
+  ctx.drawImage(tmp,0,0);
+  pushHistory(); refreshCanvasContainer();
+}
+function flipCanvas(dir){
+  const tmp = document.createElement('canvas');
+  tmp.width=mainCanvas.width; tmp.height=mainCanvas.height;
+  const tCtx = tmp.getContext('2d');
+  if(dir==='h'){ tCtx.scale(-1,1); tCtx.drawImage(mainCanvas, -tmp.width,0); }
+  else{ tCtx.scale(1,-1); tCtx.drawImage(mainCanvas,0,-tmp.height); }
+  ctx.clearRect(0,0,tmp.width,tmp.height);
+  ctx.drawImage(tmp,0,0);
+  pushHistory();
+}
+function applyStraightenPreview(){
+  // for preview we need original history? We'll apply on a temp copy from last history
+  // Simplistic: rotate current canvas by straighten angle around center, cropping
+  // We'll just apply transform on canvas without history push until user clicks Apply
+}
+$('#applyRotateBtn').addEventListener('click', ()=>{
+  const deg = +$('#straightenRange').value;
+  if(deg===0) return;
+  const tmp = document.createElement('canvas');
+  const rad = deg*Math.PI/180;
+  const w = mainCanvas.width, h = mainCanvas.height;
+  const cos = Math.abs(Math.cos(rad)), sin = Math.abs(Math.sin(rad));
+  tmp.width = Math.round(w*cos + h*sin);
+  tmp.height = Math.round(w*sin + h*cos);
+  const tCtx = tmp.getContext('2d');
+  tCtx.translate(tmp.width/2, tmp.height/2);
+  tCtx.rotate(rad);
+  tCtx.drawImage(mainCanvas, -w/2, -h/2);
+  mainCanvas.width=tmp.width; mainCanvas.height=tmp.height;
+  ctx.drawImage(tmp,0,0);
+  $('#straightenRange').value=0; $('#straightenVal').textContent='0°';
+  pushHistory(); refreshCanvasContainer();
+});
+
+/* ================== Filters ================== */
+function buildFilterString(){
+  const f = state.filters;
+  let str = `brightness(${f.brightness}%) contrast(${f.contrast}%) saturate(${f.saturate}%) blur(${f.blur}px) hue-rotate(${f.hue}deg)`;
+  if(f.grayscale) str+=' grayscale(1)';
+  if(f.sepia) str+=' sepia(1)';
+  if(f.invert) str+=' invert(1)';
+  return str;
+}
+function applyFiltersPreview(){
+  // preview using css filter on canvas container? Instead we redraw from history with filter
+  if(state.history.length===0) return;
+  const img = new Image();
+  img.onload = ()=>{
+    ctx.filter = buildFilterString();
+    ctx.clearRect(0,0,mainCanvas.width,mainCanvas.height);
+    ctx.drawImage(img,0,0,mainCanvas.width,mainCanvas.height);
+    ctx.filter='none';
+  };
+  img.src = state.history[state.historyIndex];
+}
+$$('.filter-range').forEach(inp=>{
+  inp.addEventListener('input', e=>{
+    const type = e.target.dataset.filter;
+    const val = +e.target.value;
+    if(type==='brightness'){ state.filters.brightness=val; $('#bVal').textContent=val+'%'; }
+    if(type==='contrast'){ state.filters.contrast=val; $('#cVal').textContent=val+'%'; }
+    if(type==='saturate'){ state.filters.saturate=val; $('#sVal').textContent=val+'%'; }
+    if(type==='blur'){ state.filters.blur=val; $('#blVal').textContent=val+'px'; }
+    if(type==='hue'){ state.filters.hue=val; $('#hVal').textContent=val+'°'; }
+    applyFiltersPreview();
+  });
+});
+$$('.filter-check').forEach(chk=>{
+  chk.addEventListener('change', e=>{
+    const type = e.target.dataset.filter;
+    state.filters[type]=e.target.checked;
+    applyFiltersPreview();
+  });
+});
+$('#clearFiltersBtn').addEventListener('click', ()=>{
+  state.filters={brightness:100,contrast:100,saturate:100,blur:0,hue:0,grayscale:false,sepia:false,invert:false};
+  $$('.filter-range').forEach(r=>{
+    const t=r.dataset.filter;
+    if(t==='brightness'||t==='contrast'||t==='saturate') r.value=100;
+    if(t==='blur') r.value=0;
+    if(t==='hue') r.value=0;
+  });
+  $$('.filter-check').forEach(c=> c.checked=false);
+  $('#bVal').textContent='100%'; $('#cVal').textContent='100%'; $('#sVal').textContent='100%'; $('#blVal').textContent='0px'; $('#hVal').textContent='0°';
+  applyFiltersPreview();
+});
+$('#applyFiltersBtn').addEventListener('click', ()=>{ pushHistory(); estimateSize(); });
+
+/* ================== Watermark ================== */
+$('#wmText').addEventListener('input', e=>{ state.watermark.text=e.target.value; applyWmPreview(); });
+$('#wmSize').addEventListener('input', e=>{ state.watermark.size=+e.target.value; $('#wmSizeVal').textContent=e.target.value; applyWmPreview(); });
+$('#wmOpacity').addEventListener('input', e=>{ state.watermark.opacity=+e.target.value; $('#wmOpacityVal').textContent=e.target.value; applyWmPreview(); });
+$('#wmColor').addEventListener('input', e=>{ state.watermark.color=e.target.value; applyWmPreview(); });
+$$('.wm-pos').forEach(b=> b.addEventListener('click', ()=>{
+  $$('.wm-pos').forEach(x=> x.className='wm-pos h-7 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-[10px]');
+  b.className='wm-pos active h-7 rounded-lg border bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[10px]';
+  state.watermark.pos=b.dataset.pos; applyWmPreview();
+}));
+function applyWmPreview(){
+  if(!state.history[state.historyIndex]) return;
+  const img = new Image();
+  img.onload = ()=>{
+    ctx.clearRect(0,0,mainCanvas.width,mainCanvas.height);
+    ctx.drawImage(img,0,0);
+    if(!state.watermark.text) return;
+    ctx.save();
+    ctx.globalAlpha = state.watermark.opacity/100;
+    ctx.fillStyle = state.watermark.color;
+    ctx.font = `bold ${state.watermark.size}px Inter, sans-serif`;
+    ctx.textBaseline='middle';
+    const metrics = ctx.measureText(state.watermark.text);
+    const pad = 20;
+    let x=pad, y=mainCanvas.height/2;
+    const pos = state.watermark.pos;
+    if(pos.includes('t')) y=pad+state.watermark.size/2;
+    if(pos.includes('b')) y=mainCanvas.height-pad-state.watermark.size/2;
+    if(pos.includes('c') && pos.length===2) { // tc, bc, mc, etc
+      if(pos==='tc'||pos==='bc'||pos==='mc') x = (mainCanvas.width-metrics.width)/2;
+    }
+    if(pos==='tl'||pos==='ml'||pos==='bl') x=pad;
+    if(pos==='tr'||pos==='mr'||pos==='br') x=mainCanvas.width-metrics.width-pad;
+    if(pos==='mc') y=mainCanvas.height/2;
+    // shadow for readability
+    ctx.shadowColor='rgba(0,0,0,0.5)'; ctx.shadowBlur=8; ctx.shadowOffsetY=2;
+    ctx.fillText(state.watermark.text, x, y);
+    ctx.restore();
+  };
+  img.src = state.history[state.historyIndex];
+}
+$('#applyWmBtn').addEventListener('click', ()=>{ pushHistory(); });
+
+/* ================== Zoom & Compare ================== */
+$('#zoomInBtn').addEventListener('click', ()=>{ state.zoom=Math.min(300, state.zoom+25); $('#zoomLabel').textContent=state.zoom+'%'; $('#canvasContainer').style.transform=`scale(${state.zoom/100})`; });
+$('#zoomOutBtn').addEventListener('click', ()=>{ state.zoom=Math.max(25, state.zoom-25); $('#zoomLabel').textContent=state.zoom+'%'; $('#canvasContainer').style.transform=`scale(${state.zoom/100})`; });
+$('#compareBtn').addEventListener('click', ()=>{
+  state.compare=!state.compare;
+  $('#compareWrap').classList.toggle('hidden', !state.compare);
+  $('#compareBtn').classList.toggle('bg-zinc-900', state.compare);
+  $('#compareBtn').classList.toggle('text-white', state.compare);
+});
+$('#compareRange').addEventListener('input', e=>{
+  const v = e.target.value;
+  $('#compareLeft').style.width=v+'%';
+  $('#compareHandle').style.left=v+'%';
+});
+
+/* ================== History Undo Redo ================== */
+$('#undoBtn').addEventListener('click', ()=>{ if(state.historyIndex>0) restoreHistory(state.historyIndex-1); });
+$('#redoBtn').addEventListener('click', ()=>{ if(state.historyIndex<state.history.length-1) restoreHistory(state.historyIndex+1); });
+document.addEventListener('keydown', e=>{
+  if((e.ctrlKey||e.metaKey) && e.key==='z'){ e.preventDefault(); if(state.historyIndex>0) restoreHistory(state.historyIndex-1); }
+  if((e.ctrlKey||e.metaKey) && e.key==='y'){ e.preventDefault(); if(state.historyIndex<state.history.length-1) restoreHistory(state.historyIndex+1); }
+  if(e.key==='c' && !e.ctrlKey && !e.metaKey){ $('#compareBtn').click(); }
+});
+$('#resetBtn').addEventListener('click', ()=>{
+  if(!state.originalImg) return;
+  mainCanvas.width=state.originalWidth; mainCanvas.height=state.originalHeight;
+  ctx.clearRect(0,0,mainCanvas.width,mainCanvas.height);
+  ctx.drawImage(state.originalImg,0,0);
+  state.history=[]; state.historyIndex=-1; pushHistory(); refreshCanvasContainer(); estimateSize();
+});
+
+/* ================== Download ================== */
+function downloadCanvas(mime='image/jpeg', quality=0.85){
+  const fmt = mime.split('/')[1];
+  const name = (state.originalFile?.name?.split('.').slice(0,-1).join('.')||'image') + `.${fmt==='jpeg'?'jpg':fmt}`;
+  mainCanvas.toBlob(blob=>{
+    if(!blob) return;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href=url; a.download=name; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url), 1000);
+  }, mime, quality);
+}
+$('#downloadBtn').addEventListener('click', ()=>{
+  const mime = state.format==='original' ? (state.originalFile?.type||'image/jpeg') : state.format;
+  const q = state.format==='image/png'?undefined:state.quality/100;
+  downloadCanvas(mime,q);
+});
+
+/* ================== Batch ================== */
+function renderBatch(){
+  const list = $('#batchList');
+  const strip = $('#batchStrip');
+  const count = $('#batchCount');
+  if(state.batch.length<=1){ strip.classList.add('hidden'); return; }
+  strip.classList.remove('hidden');
+  count.textContent = state.batch.length;
+  list.innerHTML='';
+  state.batch.forEach((item,i)=>{
+    const div = document.createElement('div');
+    div.className='relative w-[88px] h-[88px] rounded-xl overflow-hidden bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex-shrink-0 group cursor-pointer';
+    div.innerHTML=`<img src="${item.dataUrl}" class="w-full h-full object-cover"><div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1"><button class="w-6 h-6 rounded-full bg-white text-zinc-900 text-[12px] select-btn">✓</button><button class="w-6 h-6 rounded-full bg-red-500 text-white text-[12px] del-btn">✕</button></div><div class="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] px-1 py-0.5 truncate">${item.name}</div>`;
+    div.querySelector('.select-btn').addEventListener('click', (e)=>{ e.stopPropagation(); loadFile(item.file); });
+    div.querySelector('.del-btn').addEventListener('click', (e)=>{ e.stopPropagation(); state.batch.splice(i,1); renderBatch(); if(state.batch.length===0) showEmpty(); });
+    div.addEventListener('click', ()=> loadFile(item.file));
+    list.appendChild(div);
+  });
+}
+$('#clearBatchBtn').addEventListener('click', ()=>{ state.batch=[]; renderBatch(); showEmpty(); });
+$('#batchZipBtn').addEventListener('click', async()=>{
+  if(state.batch.length===0) return;
+  const zip = new JSZip();
+  // For simplicity, we will export current canvas for each? Actually need to re-render each image with current settings? We'll just zip original conversions with current quality/format
+  const mime = state.format==='original' ? 'image/jpeg' : state.format;
+  const q = state.quality/100;
+  for(let i=0;i<state.batch.length;i++){
+    const item = state.batch[i];
+    // create temp canvas for each
+    const tmpCanvas = document.createElement('canvas');
+    tmpCanvas.width=item.img.width; tmpCanvas.height=item.img.height;
+    tmpCanvas.getContext('2d').drawImage(item.img,0,0);
+    const blob = await new Promise(res=> tmpCanvas.toBlob(res, mime, q));
+    if(blob){
+      const ext = mime.split('/')[1]==='jpeg'?'jpg':mime.split('/')[1];
+      const base = item.name.split('.').slice(0,-1).join('.')||'image';
+      zip.file(`${base}.${ext}`, blob);
+    }
+  }
+  const content = await zip.generateAsync({type:'blob'});
+  const url = URL.createObjectURL(content);
+  const a=document.createElement('a'); a.href=url; a.download='imgtool-batch.zip'; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+});
+
+/* ================== Theme ================== */
+const themeBtn = $('#themeBtn');
+function setTheme(dark){ document.documentElement.classList.toggle('dark', dark); themeBtn.textContent = dark?'☀️':'🌙'; localStorage.setItem('imgtool-theme', dark?'dark':'light'); }
+setTheme(localStorage.getItem('imgtool-theme')==='dark' || (!localStorage.getItem('imgtool-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches));
+themeBtn.addEventListener('click', ()=> setTheme(!document.documentElement.classList.contains('dark')));
+
+/* ================== Init ================== */
+refreshCanvasContainer();
+</script>
+</body>
+</html>
