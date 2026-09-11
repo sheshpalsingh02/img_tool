@@ -4,29 +4,23 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ImgTool — Privacy-first image toolkit</title>
-<meta name="description" content="Compress, resize, convert, crop — 100% in browser. No upload. Inspired by Squoosh, built with Linear-grade design system.">
+<meta name="description" content="Compress, resize, convert, crop — 100% in browser via Canvas + WASM. No upload. Multi-language.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pica@9.0.1/dist/pica.min.js"></script>
 <script>
 tailwind.config={
   darkMode:'class',
   theme:{
     extend:{
       fontFamily:{ sans:['Inter','sans-serif'], mono:['Geist Mono','monospace'] },
-      colors:{
-        accent:{ DEFAULT:'#5a3cff', 50:'#f5f3ff', 100:'#ede9fe', 600:'#5a3cff', 700:'#4c32d6' },
-        ink:{ 900:'#0a0a0b', 800:'#18181b', 700:'#27272a', 50:'#fafafa' }
-      },
+      colors:{ accent:{ DEFAULT:'#5a3cff', 50:'#f5f3ff', 100:'#ede9fe', 600:'#5a3cff' } },
       borderRadius:{ xl:'12px', '2xl':'16px', '3xl':'20px' },
-      boxShadow:{
-        'card':'0 1px 2px rgba(0,0,0,.04), 0 4px 12px rgba(0,0,0,.04)',
-        'card-hover':'0 2px 8px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.06)',
-        'focus':'0 0 0 2px #fff, 0 0 0 4px #5a3cff'
-      },
+      boxShadow:{ 'card':'0 1px 2px rgba(0,0,0,.04), 0 4px 12px rgba(0,0,0,.04)', 'card-hover':'0 2px 8px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.06)' },
       animation:{ 'in':'in .35s cubic-bezier(.16,1,.3,1)' },
       keyframes:{ in:{'0%':{opacity:0,transform:'translateY(6px)'},'100%':{opacity:1,transform:'translateY(0)'}} }
     }
@@ -34,460 +28,481 @@ tailwind.config={
 }
 </script>
 <style>
-  :root{ --grid:8px; --radius:12px; --accent:#5a3cff; }
-  *{ -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
-  html{ font-size:14px; }
-  body{ font-feature-settings:"ss01","ss02","cv01","cv02"; }
-  /* 8pt grid helpers */
-  .stack-8> * + *{ margin-top:8px } .stack-16> * + *{ margin-top:16px } .stack-24> * + *{ margin-top:24px }
-  /* Checker */
-  .checker{
-    background-image:
-      linear-gradient(45deg,#e4e4e7 25%,transparent 25%),
-      linear-gradient(-45deg,#e4e4e7 25%,transparent 25%),
-      linear-gradient(45deg,transparent 75%,#e4e4e7 75%),
-      linear-gradient(-45deg,transparent 75%,#e4e4e7 75%);
-    background-size:20px 20px;
-    background-position:0 0,0 10px,10px -10px,-10px 0px;
-  }
-  .dark .checker{
-    background-image:
-      linear-gradient(45deg,#27272a 25%,transparent 25%),
-      linear-gradient(-45deg,#27272a 25%,transparent 25%),
-      linear-gradient(45deg,transparent 75%,#27272a 75%),
-      linear-gradient(-45deg,transparent 75%,#27272a 75%);
-  }
-  /* Range - Linear/Stripe style */
-  input[type=range]{
-    -webkit-appearance:none; appearance:none; height:4px; background:#e4e4e7; border-radius:999px; outline:none; width:100%;
-  }
+  :root{ --accent:#5a3cff; }
+  *{ -webkit-font-smoothing:antialiased }
+  html{ font-size:14px }
+  .checker{ background-image:linear-gradient(45deg,#e4e4e7 25%,transparent 25%),linear-gradient(-45deg,#e4e4e7 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#e4e4e7 75%),linear-gradient(-45deg,transparent 75%,#e4e4e7 75%); background-size:20px 20px; background-position:0 0,0 10px,10px -10px,-10px 0px }
+  .dark .checker{ background-image:linear-gradient(45deg,#27272a 25%,transparent 25%),linear-gradient(-45deg,#27272a 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#27272a 75%),linear-gradient(-45deg,transparent 75%,#27272a 75%) }
+  input[type=range]{ -webkit-appearance:none; appearance:none; height:4px; background:#e4e4e7; border-radius:999px; outline:none; width:100% }
   .dark input[type=range]{ background:#3f3f46 }
-  input[type=range]::-webkit-slider-thumb{
-    -webkit-appearance:none; width:16px; height:16px; background:#0a0a0b; border-radius:50%; cursor:pointer; border:2px solid white; box-shadow:0 1px 3px rgba(0,0,0,.2); transition:transform .15s;
-  }
+  input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; width:16px; height:16px; background:#0a0a0b; border-radius:50%; cursor:pointer; border:2px solid white; box-shadow:0 1px 3px rgba(0,0,0,.2); transition:transform .15s }
   input[type=range]:active::-webkit-slider-thumb{ transform:scale(1.2) }
   .dark input[type=range]::-webkit-slider-thumb{ background:white; border-color:#18181b }
-  input[type=range]::-moz-range-thumb{ width:16px; height:16px; background:#0a0a0b; border-radius:50%; cursor:pointer; border:2px solid white; }
-  /* Focus */
-  .focus-ring:focus-visible{ outline:none; box-shadow:0 0 0 2px white, 0 0 0 4px var(--accent); }
-  /* Scrollbar */
+  .focus-ring:focus-visible{ outline:none; box-shadow:0 0 0 2px white, 0 0 0 4px var(--accent) }
   ::-webkit-scrollbar{ width:5px; height:5px } ::-webkit-scrollbar-thumb{ background:#d4d4d8; border-radius:999px } .dark ::-webkit-scrollbar-thumb{ background:#3f3f46 }
-  /* Tooltip */
   .tooltip{ position:relative } .tooltip:hover::after{ content:attr(data-tip); position:absolute; left:calc(100% + 8px); top:50%; transform:translateY(-50%); background:#0a0a0b; color:white; font-size:11px; font-weight:500; padding:4px 8px; border-radius:6px; white-space:nowrap; pointer-events:none; z-index:50 }
   .dark .tooltip:hover::after{ background:white; color:#0a0a0b }
-  /* Split divider */
-  .split-handle{ width:2px; background:white; box-shadow:0 0 0 1px rgba(0,0,0,.1), 0 4px 12px rgba(0,0,0,.15) }
 </style>
 </head>
 <body class="bg-white dark:bg-[#0a0a0b] text-zinc-900 dark:text-zinc-100 font-sans antialiased selection:bg-accent/20">
-<!-- Header - Linear/Stripe grade: 56px, border-b, minimal -->
+
 <header class="sticky top-0 z-40 h-[56px] border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-[12px]">
   <div class="h-full max-w-[1600px] mx-auto px-4 md:px-6 flex items-center justify-between gap-4">
     <div class="flex items-center gap-5">
       <a href="#" class="flex items-center gap-2.5 focus-ring rounded-lg">
-        <div class="w-8 h-8 rounded-[10px] bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 flex items-center justify-center">
-          <i data-lucide="aperture" class="w-[18px] h-[18px]"></i>
-        </div>
-        <div class="hidden sm:block leading-none">
-          <div class="font-bold tracking-[-0.02em] text-[15px]">imgtool</div>
-          <div class="text-[10px] font-medium tracking-widest text-zinc-500 uppercase -mt-0.5">Studio</div>
-        </div>
+        <div class="w-8 h-8 rounded-[10px] bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 flex items-center justify-center"><i data-lucide="aperture" class="w-[18px] h-[18px]"></i></div>
+        <div class="hidden sm:block leading-none"><div class="font-bold tracking-[-0.02em] text-[15px]">imgtool</div><div class="text-[10px] font-medium tracking-widest text-zinc-500 uppercase -mt-0.5">Studio</div></div>
       </a>
       <div class="hidden md:flex items-center gap-2">
-        <span class="inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[11px] font-medium">
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>Local • Private
-        </span>
-        <span class="hidden lg:inline-flex h-6 px-2.5 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 text-[11px] font-medium">No upload • Offline</span>
+        <span class="inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[11px] font-medium"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span><span data-i18n="header.local_private">Local • Private</span></span>
+        <span class="hidden lg:inline-flex h-6 px-2.5 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 text-[11px] font-medium"><span data-i18n="header.no_upload">No upload • Offline • Canvas+WASM</span></span>
       </div>
     </div>
     <div class="flex items-center gap-1.5">
-      <div class="hidden md:flex items-center gap-1 text-[11px] font-mono text-zinc-500 mr-2">
-        <kbd class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">⌘V</kbd> paste
-        <span class="mx-1">•</span>
-        <kbd class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 border">C</kbd> compare
+      <div class="hidden lg:flex items-center gap-1 text-[11px] font-mono text-zinc-500 mr-2">
+        <kbd class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 border">⌘V</kbd> <span data-i18n="header.paste">paste</span> <span class="mx-1">•</span> <kbd class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 border">C</kbd> <span data-i18n="header.compare">compare</span>
       </div>
-      <button id="pasteBtn" class="h-8 px-3 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 text-[12px] font-medium flex items-center gap-1.5 focus-ring transition">
-        <i data-lucide="clipboard" class="w-3.5 h-3.5"></i> Paste
-      </button>
-      <button id="themeBtn" class="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center hover:bg-zinc-200 transition focus-ring">
-        <i data-lucide="moon" class="w-4 h-4 dark:hidden"></i><i data-lucide="sun" class="w-4 h-4 hidden dark:block"></i>
-      </button>
+
+      <!-- Language Switcher -->
+      <div class="relative">
+        <button id="langBtn" class="h-8 px-2.5 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-[12px] font-medium flex items-center gap-1.5 focus-ring hover:bg-zinc-200 transition"><i data-lucide="languages" class="w-3.5 h-3.5"></i><span id="langLabel">EN</span><i data-lucide="chevron-down" class="w-3 h-3"></i></button>
+        <div id="langMenu" class="hidden absolute right-0 top-[40px] w-[200px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-[0_8px_24px_rgba(0,0,0,.12)] p-1.5 z-50">
+          <button data-lang="en" class="lang-opt w-full text-left px-3 py-2 rounded-lg text-[13px] flex items-center justify-between hover:bg-zinc-100 dark:hover:bg-zinc-800"><span>🇺🇸 English</span><span class="text-[11px] font-mono text-zinc-400">EN</span></button>
+          <button data-lang="hi" class="lang-opt w-full text-left px-3 py-2 rounded-lg text-[13px] flex items-center justify-between hover:bg-zinc-100 dark:hover:bg-zinc-800"><span>🇮🇳 हिन्दी</span><span class="text-[11px] font-mono text-zinc-400">HI</span></button>
+          <button data-lang="es" class="lang-opt w-full text-left px-3 py-2 rounded-lg text-[13px] flex items-center justify-between hover:bg-zinc-100 dark:hover:bg-zinc-800"><span>🇪🇸 Español</span><span class="text-[11px] font-mono">ES</span></button>
+          <button data-lang="fr" class="lang-opt w-full text-left px-3 py-2 rounded-lg text-[13px] flex items-center justify-between hover:bg-zinc-100 dark:hover:bg-zinc-800"><span>🇫🇷 Français</span><span class="text-[11px] font-mono">FR</span></button>
+          <button data-lang="de" class="lang-opt w-full text-left px-3 py-2 rounded-lg text-[13px] flex items-center justify-between hover:bg-zinc-100 dark:hover:bg-zinc-800"><span>🇩🇪 Deutsch</span><span class="text-[11px] font-mono">DE</span></button>
+          <button data-lang="ja" class="lang-opt w-full text-left px-3 py-2 rounded-lg text-[13px] flex items-center justify-between hover:bg-zinc-100 dark:hover:bg-zinc-800"><span>🇯🇵 日本語</span><span class="text-[11px] font-mono">JA</span></button>
+          <button data-lang="zh" class="lang-opt w-full text-left px-3 py-2 rounded-lg text-[13px] flex items-center justify-between hover:bg-zinc-100 dark:hover:bg-zinc-800"><span>🇨🇳 中文</span><span class="text-[11px] font-mono">ZH</span></button>
+        </div>
+      </div>
+
+      <button id="pasteBtn" class="h-8 px-3 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 text-[12px] font-medium flex items-center gap-1.5 focus-ring transition"><i data-lucide="clipboard" class="w-3.5 h-3.5"></i> <span data-i18n="header.pasteBtn">Paste</span></button>
+      <button id="themeBtn" class="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center hover:bg-zinc-200 transition focus-ring"><i data-lucide="moon" class="w-4 h-4 dark:hidden"></i><i data-lucide="sun" class="w-4 h-4 hidden dark:block"></i></button>
     </div>
   </div>
 </header>
 
-<!-- EMPTY STATE - Squoosh-inspired: centered, focused, 8pt grid -->
+<!-- EMPTY STATE -->
 <div id="emptyState" class="max-w-[1280px] mx-auto px-4 md:px-6 py-10 md:py-16 animate-in">
   <div class="max-w-[720px] mx-auto text-center">
-    <div class="inline-flex items-center gap-2 h-7 px-3 rounded-full bg-violet-50 dark:bg-violet-950/40 border border-violet-200 dark:border-violet-800 text-[11px] font-semibold text-violet-700 dark:text-violet-300">
-      <span class="w-1.5 h-1.5 rounded-full bg-violet-600"></span> Inspired by Squoosh • Linear-grade design system
-    </div>
-    <h1 class="mt-6 text-[36px] md:text-[52px] font-[800] leading-[0.95] tracking-[-0.03em]">Image tools that<br><span class="text-zinc-400 dark:text-zinc-600">stay on your device.</span></h1>
-    <p class="mt-4 text-[15px] leading-[1.6] text-zinc-600 dark:text-zinc-400 max-w-[480px] mx-auto">Compress, resize, convert, crop — all in browser via Canvas API. No server, no tracking. Built with 8pt grid, WCAG AA+, purposeful motion.</p>
+    <div class="inline-flex items-center gap-2 h-7 px-3 rounded-full bg-violet-50 dark:bg-violet-950/40 border border-violet-200 dark:border-violet-800 text-[11px] font-semibold text-violet-700 dark:text-violet-300"><span class="w-1.5 h-1.5 rounded-full bg-violet-600"></span><span data-i18n="hero.badge">Canvas + WASM • No upload • Multi-language</span></div>
+    <h1 class="mt-6 text-[36px] md:text-[52px] font-[800] leading-[0.95] tracking-[-0.03em]"><span data-i18n="hero.title1">Image tools that</span><br><span class="text-zinc-400 dark:text-zinc-600" data-i18n="hero.title2">stay on your device.</span></h1>
+    <p class="mt-4 text-[15px] leading-[1.6] text-zinc-600 dark:text-zinc-400 max-w-[480px] mx-auto" data-i18n="hero.desc">Compress, resize, convert — 100% in browser via Canvas API + pica WASM. No server, no tracking. Now in 7 languages.</p>
 
-    <!-- Dropzone - Stripe style: dashed, hover accent, inner card -->
     <div id="dropzone" class="group mt-8 relative rounded-[20px] border-[1.5px] border-dashed border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-2 hover:border-zinc-900 dark:hover:border-white transition-colors cursor-pointer focus-ring">
       <div class="rounded-[14px] bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200/60 dark:border-zinc-700/50 p-8 md:p-10 text-center">
-        <div class="mx-auto w-12 h-12 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 flex items-center justify-center shadow-sm">
-          <i data-lucide="upload" class="w-6 h-6"></i>
-        </div>
-        <div class="mt-4 text-[17px] font-semibold tracking-[-0.01em]">Drop images here</div>
-        <div class="mt-1 text-[13px] text-zinc-500">or click to browse • drag from Figma • paste anywhere</div>
+        <div class="mx-auto w-12 h-12 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 flex items-center justify-center shadow-sm"><i data-lucide="upload" class="w-6 h-6"></i></div>
+        <div class="mt-4 text-[17px] font-semibold tracking-[-0.01em]" data-i18n="drop.title">Drop images here</div>
+        <div class="mt-1 text-[13px] text-zinc-500" data-i18n="drop.subtitle">or click to browse • drag from Figma • paste anywhere</div>
         <div class="mt-5 flex flex-wrap justify-center gap-1.5">
           <span class="px-2.5 py-1 rounded-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-[11px] font-medium">JPG</span>
           <span class="px-2.5 py-1 rounded-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-[11px] font-medium">PNG</span>
           <span class="px-2.5 py-1 rounded-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-[11px] font-medium">WEBP</span>
           <span class="px-2.5 py-1 rounded-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-[11px] font-medium">AVIF</span>
+          <span class="px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-[11px] font-medium">WASM</span>
         </div>
-        <button class="mt-6 h-10 px-5 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[13px] font-semibold shadow-sm hover:opacity-90 transition">Choose files</button>
-        <div class="mt-3 text-[11px] font-mono text-zinc-400">Max 50MB • Works offline after first load</div>
+        <button class="mt-6 h-10 px-5 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[13px] font-semibold shadow-sm hover:opacity-90 transition" data-i18n="drop.choose">Choose files</button>
+        <div class="mt-3 text-[11px] font-mono text-zinc-400" data-i18n="drop.max">Max 50MB • Works offline • pica WASM for resize</div>
       </div>
       <input id="fileInput" type="file" accept="image/*" multiple class="hidden">
     </div>
 
-    <!-- Sample - minimal -->
     <div class="mt-6 flex items-center justify-center gap-2 text-[11px]">
-      <span class="text-zinc-400 font-medium uppercase tracking-widest">Try</span>
+      <span class="text-zinc-400 font-medium uppercase tracking-widest" data-i18n="drop.try">Try</span>
       <div class="flex gap-2">
-        <button data-sample="https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1200" class="h-7 px-3 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-[11px] font-medium hover:bg-zinc-200 transition">Landscape</button>
-        <button data-sample="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=1200" class="h-7 px-3 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-[11px] font-medium hover:bg-zinc-200 transition">Portrait</button>
-        <button data-sample="https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=1200" class="h-7 px-3 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-[11px] font-medium hover:bg-zinc-200 transition">Product</button>
+        <button data-sample="https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1200" class="h-7 px-3 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-[11px] font-medium hover:bg-zinc-200 transition" data-i18n="sample.landscape">Landscape</button>
+        <button data-sample="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=1200" class="h-7 px-3 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-[11px] font-medium hover:bg-zinc-200 transition" data-i18n="sample.portrait">Portrait</button>
+        <button data-sample="https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=1200" class="h-7 px-3 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-[11px] font-medium hover:bg-zinc-200 transition" data-i18n="sample.product">Product</button>
       </div>
     </div>
   </div>
 
-  <!-- Features - 3 columns, unified card style, 8pt spacing -->
   <div class="mt-16 grid md:grid-cols-3 gap-4 max-w-[1040px] mx-auto">
-    <div class="rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 shadow-card hover:shadow-card-hover transition-shadow">
-      <div class="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center"><i data-lucide="zap" class="w-4 h-4"></i></div>
-      <div class="mt-3 font-semibold text-[13px]">Squoosh-style compression</div>
-      <div class="mt-1 text-[12px] leading-[1.6] text-zinc-500">Real-time size, quality slider, WebP/AVIF, split-view comparison. 72% avg reduction.</div>
+    <div class="rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 shadow-card">
+      <div class="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 border flex items-center justify-center"><i data-lucide="zap" class="w-4 h-4"></i></div>
+      <div class="mt-3 font-semibold text-[13px]" data-i18n="feat.compress.title">Compress • Canvas + WASM</div>
+      <div class="mt-1 text-[12px] leading-[1.6] text-zinc-500" data-i18n="feat.compress.desc">Quality slider, WebP/AVIF with native codecs, PNG lossless, target size, real-time savings, split compare.</div>
       <div class="mt-4 h-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden flex"><div class="flex-1 bg-zinc-900 dark:bg-white"></div><div class="flex-1 bg-emerald-500 ml-1"></div></div>
-      <div class="mt-2 flex justify-between text-[10px] font-mono text-zinc-400"><span>Original</span><span class="text-emerald-600 font-medium">-78% smaller</span></div>
+      <div class="mt-2 flex justify-between text-[10px] font-mono text-zinc-400"><span data-i18n="feat.compress.orig">Original</span><span class="text-emerald-600 font-medium" data-i18n="feat.compress.save">-78% smaller</span></div>
     </div>
-    <div class="rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 shadow-card hover:shadow-card-hover transition-shadow">
-      <div class="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center"><i data-lucide="maximize" class="w-4 h-4"></i></div>
-      <div class="mt-3 font-semibold text-[13px]">Resize • Crop • Rotate</div>
-      <div class="mt-1 text-[12px] leading-[1.6] text-zinc-500">Presets for OG, Instagram, YouTube. Aspect lock, smart crop box, straighten.</div>
+    <div class="rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 shadow-card">
+      <div class="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 border flex items-center justify-center"><i data-lucide="maximize" class="w-4 h-4"></i></div>
+      <div class="mt-3 font-semibold text-[13px]" data-i18n="feat.resize.title">Resize • pica WASM</div>
+      <div class="mt-1 text-[12px] leading-[1.6] text-zinc-500" data-i18n="feat.resize.desc">High-quality Lanczos via pica WASM, aspect lock, scale %, presets (FHD, IG, OG), fit modes, no enlarge, BG color.</div>
       <div class="mt-4 grid grid-cols-3 gap-1 text-[10px] font-mono"><span class="px-2 py-1 rounded bg-zinc-50 dark:bg-zinc-800 border text-center">1920×1080</span><span class="px-2 py-1 rounded bg-zinc-50 dark:bg-zinc-800 border text-center">1080×1080</span><span class="px-2 py-1 rounded bg-zinc-50 dark:bg-zinc-800 border text-center">1200×628</span></div>
     </div>
-    <div class="rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 shadow-card hover:shadow-card-hover transition-shadow">
-      <div class="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center"><i data-lucide="shield-check" class="w-4 h-4"></i></div>
-      <div class="mt-3 font-semibold text-[13px]">Privacy by design</div>
-      <div class="mt-1 text-[12px] leading-[1.6] text-zinc-500">Canvas API only. No upload, no cookies, no tracking. Works offline, open source.</div>
-      <div class="mt-4 flex items-center gap-2 text-[11px]"><span class="px-2 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 font-medium">Local</span><span class="px-2 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 border text-zinc-600 dark:text-zinc-400">WCAG AA+</span></div>
+    <div class="rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 shadow-card">
+      <div class="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 border flex items-center justify-center"><i data-lucide="repeat" class="w-4 h-4"></i></div>
+      <div class="mt-3 font-semibold text-[13px]" data-i18n="feat.convert.title">Convert • Multi-format</div>
+      <div class="mt-1 text-[12px] leading-[1.6] text-zinc-500" data-i18n="feat.convert.desc">JPG ↔ PNG ↔ WebP ↔ AVIF (if supported), keep transparency, BG for JPG, batch ZIP, multi-language UI.</div>
+      <div class="mt-4 flex items-center gap-2 text-[11px]"><span class="px-2 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 font-medium">Canvas</span><span class="px-2 py-1 rounded-full bg-violet-50 dark:bg-violet-950/40 border border-violet-200 dark:border-violet-800 text-violet-700 dark:text-violet-300 font-medium">WASM</span><span class="px-2 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 border text-zinc-600">i18n</span></div>
     </div>
-  </div>
-
-  <!-- Design system note -->
-  <div class="mt-8 max-w-[1040px] mx-auto rounded-2xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 p-4 flex gap-3 items-start">
-    <div class="w-8 h-8 rounded-lg bg-white/10 dark:bg-zinc-900/10 flex items-center justify-center flex-shrink-0"><i data-lucide="palette" class="w-4 h-4"></i></div>
-    <div class="text-[12px] leading-[1.6]"><span class="font-semibold">Design system:</span> 8pt grid, Inter + Geist Mono, zinc neutrals + violet accent (single), 12px radius, 150ms ease, focus-ring, shadcn/ui card pattern. Inspired by Linear & Stripe — minimal chrome, content-first.</div>
   </div>
 </div>
 
-<!-- APP STATE - Linear app layout -->
+<!-- APP STATE -->
 <div id="appState" class="hidden">
   <div class="flex min-h-[calc(100vh-56px)]">
-    <!-- Sidebar - 64px, icon-only, tooltip, Linear style -->
     <aside class="w-[64px] shrink-0 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 sticky top-[56px] h-[calc(100vh-56px)] flex flex-col items-center py-3 gap-1 z-20">
-      <button data-tool="compress" class="tool-btn active w-10 h-10 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 flex items-center justify-center shadow-sm focus-ring transition tooltip" data-tip="Compress (1)"><i data-lucide="minimize-2" class="w-[18px] h-[18px]"></i></button>
-      <button data-tool="resize" class="tool-btn w-10 h-10 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-900 dark:hover:text-white flex items-center justify-center focus-ring transition tooltip" data-tip="Resize (2)"><i data-lucide="move" class="w-[18px] h-[18px]"></i></button>
-      <button data-tool="convert" class="tool-btn w-10 h-10 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-900 flex items-center justify-center focus-ring transition tooltip" data-tip="Convert (3)"><i data-lucide="repeat" class="w-[18px] h-[18px]"></i></button>
-      <button data-tool="crop" class="tool-btn w-10 h-10 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-900 flex items-center justify-center focus-ring transition tooltip" data-tip="Crop (4)"><i data-lucide="crop" class="w-[18px] h-[18px]"></i></button>
-      <button data-tool="rotate" class="tool-btn w-10 h-10 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-900 flex items-center justify-center focus-ring transition tooltip" data-tip="Rotate (5)"><i data-lucide="rotate-cw" class="w-[18px] h-[18px]"></i></button>
-      <button data-tool="adjust" class="tool-btn w-10 h-10 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-900 flex items-center justify-center focus-ring transition tooltip" data-tip="Adjust (6)"><i data-lucide="sliders-horizontal" class="w-[18px] h-[18px]"></i></button>
-      <button data-tool="watermark" class="tool-btn w-10 h-10 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-900 flex items-center justify-center focus-ring transition tooltip" data-tip="Watermark (7)"><i data-lucide="type" class="w-[18px] h-[18px]"></i></button>
+      <button data-tool="compress" class="tool-btn active w-10 h-10 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 flex items-center justify-center shadow-sm focus-ring tooltip" data-tip="Compress (1)"><i data-lucide="minimize-2" class="w-[18px] h-[18px]"></i></button>
+      <button data-tool="resize" class="tool-btn w-10 h-10 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 flex items-center justify-center focus-ring tooltip" data-tip="Resize (2)"><i data-lucide="move" class="w-[18px] h-[18px]"></i></button>
+      <button data-tool="convert" class="tool-btn w-10 h-10 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 flex items-center justify-center focus-ring tooltip" data-tip="Convert (3)"><i data-lucide="repeat" class="w-[18px] h-[18px]"></i></button>
+      <button data-tool="crop" class="tool-btn w-10 h-10 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 flex items-center justify-center focus-ring tooltip" data-tip="Crop (4)"><i data-lucide="crop" class="w-[18px] h-[18px]"></i></button>
+      <button data-tool="rotate" class="tool-btn w-10 h-10 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 flex items-center justify-center focus-ring tooltip" data-tip="Rotate (5)"><i data-lucide="rotate-cw" class="w-[18px] h-[18px]"></i></button>
+      <button data-tool="adjust" class="tool-btn w-10 h-10 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 flex items-center justify-center focus-ring tooltip" data-tip="Adjust (6)"><i data-lucide="sliders-horizontal" class="w-[18px] h-[18px]"></i></button>
+      <button data-tool="watermark" class="tool-btn w-10 h-10 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 flex items-center justify-center focus-ring tooltip" data-tip="Watermark (7)"><i data-lucide="type" class="w-[18px] h-[18px]"></i></button>
       <div class="w-6 h-px bg-zinc-200 dark:bg-zinc-800 my-2"></div>
-      <button id="addMoreBtn" class="w-10 h-10 rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700 text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center justify-center focus-ring transition tooltip" data-tip="Add images"><i data-lucide="plus" class="w-4 h-4"></i></button>
-      <div class="mt-auto flex flex-col items-center gap-2">
-        <div class="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-[10px] font-mono font-medium" id="fileCountBadge">1</div>
-      </div>
+      <button id="addMoreBtn" class="w-10 h-10 rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700 text-zinc-500 hover:bg-zinc-50 flex items-center justify-center focus-ring tooltip" data-tip="Add"><i data-lucide="plus" class="w-4 h-4"></i></button>
+      <div class="mt-auto flex flex-col items-center gap-2"><div class="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 border flex items-center justify-center text-[10px] font-mono font-medium" id="fileCountBadge">1</div></div>
     </aside>
 
-    <!-- Main workspace - bg zinc-50 like Linear -->
     <main class="flex-1 min-w-0 flex flex-col bg-zinc-50 dark:bg-[#0f0f10]">
-      <!-- Top toolbar - 48px, Stripe style -->
       <div class="h-[48px] shrink-0 border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-[8px] flex items-center justify-between px-3 gap-2 sticky top-0 z-10">
         <div class="flex items-center gap-2 min-w-0">
-          <button id="backBtn" class="w-7 h-7 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center hover:bg-zinc-200 transition focus-ring"><i data-lucide="arrow-left" class="w-3.5 h-3.5"></i></button>
-          <div class="hidden md:flex items-center gap-2.5 min-w-0 pl-1">
-            <div class="w-7 h-7 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 flex items-center justify-center"><i data-lucide="image" class="w-3.5 h-3.5"></i></div>
-            <div class="min-w-0">
-              <div id="fileNameLabel" class="text-[13px] font-medium leading-none truncate max-w-[180px]">image.jpg</div>
-              <div id="fileMetaLabel" class="text-[11px] font-mono text-zinc-500 leading-none mt-1">—</div>
-            </div>
-          </div>
+          <button id="backBtn" class="w-7 h-7 rounded-full bg-zinc-100 dark:bg-zinc-800 border flex items-center justify-center hover:bg-zinc-200 transition focus-ring"><i data-lucide="arrow-left" class="w-3.5 h-3.5"></i></button>
+          <div class="hidden md:flex items-center gap-2.5 min-w-0 pl-1"><div class="w-7 h-7 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 flex items-center justify-center"><i data-lucide="image" class="w-3.5 h-3.5"></i></div><div class="min-w-0"><div id="fileNameLabel" class="text-[13px] font-medium leading-none truncate max-w-[180px]">image.jpg</div><div id="fileMetaLabel" class="text-[11px] font-mono text-zinc-500 leading-none mt-1">—</div></div></div>
           <div class="flex items-center gap-1 ml-2">
-            <button id="undoBtn" class="w-7 h-7 rounded-full border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 flex items-center justify-center hover:bg-zinc-50 disabled:opacity-40 transition focus-ring" title="Undo"><i data-lucide="undo-2" class="w-3.5 h-3.5"></i></button>
-            <button id="redoBtn" class="w-7 h-7 rounded-full border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 flex items-center justify-center hover:bg-zinc-50 disabled:opacity-40 transition focus-ring" title="Redo"><i data-lucide="redo-2" class="w-3.5 h-3.5"></i></button>
+            <button id="undoBtn" class="w-7 h-7 rounded-full border bg-white dark:bg-zinc-800 flex items-center justify-center hover:bg-zinc-50 disabled:opacity-40 focus-ring"><i data-lucide="undo-2" class="w-3.5 h-3.5"></i></button>
+            <button id="redoBtn" class="w-7 h-7 rounded-full border bg-white dark:bg-zinc-800 flex items-center justify-center hover:bg-zinc-50 disabled:opacity-40 focus-ring"><i data-lucide="redo-2" class="w-3.5 h-3.5"></i></button>
           </div>
         </div>
         <div class="flex items-center gap-1.5">
-          <div class="hidden md:flex items-center gap-1 p-1 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
-            <button id="zoomOutBtn" class="w-6 h-6 rounded-full bg-white dark:bg-zinc-700 shadow-sm flex items-center justify-center hover:bg-zinc-50 transition focus-ring"><i data-lucide="minus" class="w-3 h-3"></i></button>
-            <span id="zoomLabel" class="text-[11px] font-mono font-medium px-1 min-w-[40px] text-center">100%</span>
-            <button id="zoomInBtn" class="w-6 h-6 rounded-full bg-white dark:bg-zinc-700 shadow-sm flex items-center justify-center hover:bg-zinc-50 transition focus-ring"><i data-lucide="plus" class="w-3 h-3"></i></button>
-          </div>
-          <button id="compareBtn" class="h-7 px-3 rounded-full border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-[12px] font-medium flex items-center gap-1.5 hover:bg-zinc-50 transition focus-ring"><i data-lucide="columns-2" class="w-3.5 h-3.5"></i> Compare</button>
-          <button id="resetBtn" class="h-7 px-3 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-[12px] font-medium hover:bg-zinc-200 transition focus-ring">Reset</button>
-          <button id="downloadBtn" class="h-8 px-4 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[13px] font-semibold flex items-center gap-1.5 shadow-sm hover:opacity-90 transition focus-ring"><i data-lucide="download" class="w-3.5 h-3.5"></i> Download</button>
+          <div class="hidden md:flex items-center gap-1 p-1 rounded-full bg-zinc-100 dark:bg-zinc-800 border"><button id="zoomOutBtn" class="w-6 h-6 rounded-full bg-white dark:bg-zinc-700 shadow-sm flex items-center justify-center focus-ring"><i data-lucide="minus" class="w-3 h-3"></i></button><span id="zoomLabel" class="text-[11px] font-mono font-medium px-1 min-w-[40px] text-center">100%</span><button id="zoomInBtn" class="w-6 h-6 rounded-full bg-white dark:bg-zinc-700 shadow-sm flex items-center justify-center focus-ring"><i data-lucide="plus" class="w-3 h-3"></i></button></div>
+          <button id="compareBtn" class="h-7 px-3 rounded-full border bg-white dark:bg-zinc-800 text-[12px] font-medium flex items-center gap-1.5 hover:bg-zinc-50 focus-ring"><i data-lucide="columns-2" class="w-3.5 h-3.5"></i> <span data-i18n="toolbar.compare">Compare</span></button>
+          <button id="resetBtn" class="h-7 px-3 rounded-full bg-zinc-100 dark:bg-zinc-800 border text-[12px] font-medium hover:bg-zinc-200 focus-ring" data-i18n="toolbar.reset">Reset</button>
+          <button id="downloadBtn" class="h-8 px-4 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[13px] font-semibold flex items-center gap-1.5 shadow-sm hover:opacity-90 focus-ring"><i data-lucide="download" class="w-3.5 h-3.5"></i> <span data-i18n="toolbar.download">Download</span></button>
         </div>
       </div>
 
-      <!-- Canvas area - centered, Squoosh style split comparison -->
       <div id="canvasWrap" class="flex-1 relative overflow-auto flex items-center justify-center p-6 md:p-10">
-        <div id="canvasContainer" class="relative rounded-xl overflow-hidden bg-white shadow-[0_0_0_1px_rgba(0,0,0,.05),0_8px_24px_rgba(0,0,0,.08)] checker">
-          <canvas id="mainCanvas" class="block max-w-full max-h-full"></canvas>
-          <!-- Crop overlay - improved -->
-          <div id="cropOverlay" class="hidden absolute inset-0">
-            <div class="absolute inset-0 bg-black/40"></div>
-            <div id="cropBox" class="absolute border border-white shadow-[0_0_0_1px_rgba(0,0,0,.2)] cursor-move">
-              <div class="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none">
-                <div class="border-r border-b border-white/30"></div><div class="border-r border-b border-white/30"></div><div class="border-b border-white/30"></div>
-                <div class="border-r border-b border-white/30"></div><div class="border-r border-b border-white/30"></div><div class="border-b border-white/30"></div>
-                <div class="border-r border-white/30"></div><div class="border-r border-white/30"></div><div></div>
-              </div>
-              <div data-handle="nw" class="absolute -top-1 -left-1 w-2.5 h-2.5 bg-white border border-zinc-900 rounded-[2px] cursor-nw-resize"></div>
-              <div data-handle="ne" class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-white border border-zinc-900 rounded-[2px] cursor-ne-resize"></div>
-              <div data-handle="sw" class="absolute -bottom-1 -left-1 w-2.5 h-2.5 bg-white border border-zinc-900 rounded-[2px] cursor-sw-resize"></div>
-              <div data-handle="se" class="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-white border border-zinc-900 rounded-[2px] cursor-se-resize"></div>
-            </div>
-          </div>
+        <div id="canvasContainer" class="relative rounded-xl overflow-hidden bg-white shadow-[0_0_0_1px_rgba(0,0,0,.05),0_8px_24px_rgba(0,0,0,.08)] checker"><canvas id="mainCanvas" class="block max-w-full max-h-full"></canvas>
+          <div id="cropOverlay" class="hidden absolute inset-0"><div class="absolute inset-0 bg-black/40"></div><div id="cropBox" class="absolute border border-white shadow-[0_0_0_1px_rgba(0,0,0,.2)] cursor-move"><div class="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none"><div class="border-r border-b border-white/30"></div><div class="border-r border-b border-white/30"></div><div class="border-b border-white/30"></div><div class="border-r border-b border-white/30"></div><div class="border-r border-b border-white/30"></div><div class="border-b border-white/30"></div><div class="border-r border-white/30"></div><div class="border-r border-white/30"></div><div></div></div><div data-handle="nw" class="absolute -top-1 -left-1 w-2.5 h-2.5 bg-white border border-zinc-900 rounded-[2px] cursor-nw-resize"></div><div data-handle="ne" class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-white border border-zinc-900 rounded-[2px] cursor-ne-resize"></div><div data-handle="sw" class="absolute -bottom-1 -left-1 w-2.5 h-2.5 bg-white border border-zinc-900 rounded-[2px] cursor-sw-resize"></div><div data-handle="se" class="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-white border border-zinc-900 rounded-[2px] cursor-se-resize"></div></div></div>
         </div>
-
-        <!-- Squoosh-inspired split comparison -->
-        <div id="compareWrap" class="hidden absolute inset-0">
-          <div class="absolute inset-6 md:inset-10 rounded-xl overflow-hidden bg-white shadow-[0_0_0_1px_rgba(0,0,0,.05),0_16px_40px_rgba(0,0,0,.12)] flex">
-            <div id="compareLeft" class="relative overflow-hidden border-r border-white/80" style="width:50%">
-              <canvas id="compareCanvas" class="absolute inset-0 w-full h-full object-contain"></canvas>
-              <div class="absolute top-3 left-3 h-6 px-2.5 rounded-full bg-black/70 text-white text-[11px] font-medium flex items-center gap-1"><i data-lucide="image" class="w-3 h-3"></i> Original</div>
-            </div>
-            <div class="flex-1 relative bg-zinc-50 flex items-center justify-center">
-              <div class="absolute top-3 right-3 h-6 px-2.5 rounded-full bg-white border border-zinc-200 text-zinc-900 text-[11px] font-medium shadow-sm flex items-center gap-1"><i data-lucide="sparkles" class="w-3 h-3"></i> Edited</div>
-              <div class="text-[12px] text-zinc-400 font-mono">Live preview</div>
-            </div>
-          </div>
-          <div id="compareHandle" class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-white border border-zinc-200 shadow-[0_4px_12px_rgba(0,0,0,.15)] flex items-center justify-center cursor-ew-resize" style="left:50%"><i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-zinc-500"></i></div>
-          <input id="compareRange" type="range" min="0" max="100" value="50" class="absolute bottom-8 left-1/2 -translate-x-1/2 w-[280px]">
-        </div>
+        <div id="compareWrap" class="hidden absolute inset-0"><div class="absolute inset-6 md:inset-10 rounded-xl overflow-hidden bg-white shadow-[0_0_0_1px_rgba(0,0,0,.05),0_16px_40px_rgba(0,0,0,.12)] flex"><div id="compareLeft" class="relative overflow-hidden border-r border-white/80" style="width:50%"><canvas id="compareCanvas" class="absolute inset-0 w-full h-full object-contain"></canvas><div class="absolute top-3 left-3 h-6 px-2.5 rounded-full bg-black/70 text-white text-[11px] font-medium flex items-center gap-1"><i data-lucide="image" class="w-3 h-3"></i> <span data-i18n="compare.original">Original</span></div></div><div class="flex-1 relative bg-zinc-50 flex items-center justify-center"><div class="absolute top-3 right-3 h-6 px-2.5 rounded-full bg-white border text-zinc-900 text-[11px] font-medium shadow-sm flex items-center gap-1"><i data-lucide="sparkles" class="w-3 h-3"></i> <span data-i18n="compare.edited">Edited</span></div><div class="text-[12px] text-zinc-400 font-mono" data-i18n="compare.live">Live preview</div></div></div><div id="compareHandle" class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-white border shadow-[0_4px_12px_rgba(0,0,0,.15)] flex items-center justify-center cursor-ew-resize" style="left:50%"><i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-zinc-500"></i></div><input id="compareRange" type="range" min="0" max="100" value="50" class="absolute bottom-8 left-1/2 -translate-x-1/2 w-[280px]"></div>
       </div>
 
-      <!-- Batch strip - minimal -->
-      <div id="batchStrip" class="hidden border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3">
-        <div class="flex items-center justify-between mb-2">
-          <div class="text-[11px] font-semibold tracking-widest uppercase text-zinc-500">Batch • <span id="batchCount">0</span></div>
-          <div class="flex gap-1.5">
-            <button id="batchZipBtn" class="h-6 px-2.5 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[11px] font-medium">ZIP</button>
-            <button id="clearBatchBtn" class="h-6 px-2.5 rounded-full bg-zinc-100 dark:bg-zinc-800 border text-[11px]">Clear</button>
-          </div>
-        </div>
-        <div id="batchList" class="flex gap-2 overflow-x-auto"></div>
-      </div>
+      <div id="batchStrip" class="hidden border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3"><div class="flex items-center justify-between mb-2"><div class="text-[11px] font-semibold tracking-widest uppercase text-zinc-500"><span data-i18n="batch.title">Batch</span> • <span id="batchCount">0</span></div><div class="flex gap-1.5"><button id="batchZipBtn" class="h-6 px-2.5 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[11px] font-medium">ZIP</button><button id="clearBatchBtn" class="h-6 px-2.5 rounded-full bg-zinc-100 dark:bg-zinc-800 border text-[11px]" data-i18n="batch.clear">Clear</button></div></div><div id="batchList" class="flex gap-2 overflow-x-auto"></div></div>
     </main>
 
-    <!-- Controls - 360px, 8pt grid, Stripe style -->
-    <aside class="w-full lg:w-[360px] shrink-0 border-t lg:border-t-0 lg:border-l border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 lg:sticky lg:top-[56px] lg:h-[calc(100vh-56px)] lg:overflow-y-auto">
+    <aside class="w-full lg:w-[380px] shrink-0 border-t lg:border-t-0 lg:border-l border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 lg:sticky lg:top-[56px] lg:h-[calc(100vh-56px)] lg:overflow-y-auto">
       <div class="p-5 space-y-6">
-        <!-- Compress Panel - Squoosh best practice -->
+
+        <!-- COMPRESS - complete -->
         <div id="panel-compress" class="tool-panel space-y-6">
-          <div>
-            <h3 class="text-[13px] font-semibold tracking-[-0.01em]">Compression</h3>
-            <p class="mt-1 text-[12px] leading-[1.5] text-zinc-500">Squoosh-style: real-time size, quality affects JPG/WebP.</p>
-          </div>
-
+          <div><h3 class="text-[13px] font-semibold" data-i18n="panel.compress.title">Compression • Canvas + WASM</h3><p class="mt-1 text-[12px] leading-[1.5] text-zinc-500" data-i18n="panel.compress.desc">Real-time size, MozJPEG/WebP/AVIF via native + WASM fallback.</p></div>
           <div class="space-y-4">
-            <div>
-              <div class="flex items-center justify-between mb-2"><label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">Quality</label><span id="qualityVal" class="text-[11px] font-mono font-medium px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 border">80%</span></div>
-              <input id="qualityRange" type="range" min="1" max="100" value="80">
-              <div class="mt-1.5 flex justify-between text-[10px] font-mono text-zinc-400"><span>smaller</span><span>higher quality</span></div>
-            </div>
+            <div><div class="flex items-center justify-between mb-2"><label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500" data-i18n="panel.compress.quality">Quality</label><span id="qualityVal" class="text-[11px] font-mono font-medium px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 border">80%</span></div><input id="qualityRange" type="range" min="1" max="100" value="80"><div class="mt-1.5 flex justify-between text-[10px] font-mono text-zinc-400"><span data-i18n="panel.compress.smaller">smaller</span><span data-i18n="panel.compress.higher">higher quality</span></div></div>
 
-            <div>
-              <label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">Output</label>
-              <div class="mt-2 grid grid-cols-2 gap-2">
-                <button data-format="original" class="format-btn active h-[72px] rounded-xl border-[1.5px] border-zinc-900 dark:border-white bg-zinc-50 dark:bg-zinc-900 flex flex-col items-start p-3 text-left focus-ring"><span class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-zinc-900 dark:bg-white text-white dark:text-zinc-900">ORIG</span><span class="mt-auto text-[12px] font-semibold">Original</span><span class="text-[11px] text-zinc-500">Keep type</span></button>
-                <button data-format="image/jpeg" class="format-btn h-[72px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 flex flex-col items-start p-3 text-left hover:border-zinc-300 focus-ring"><span class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">JPG</span><span class="mt-auto text-[12px] font-semibold">JPEG</span><span class="text-[11px] text-zinc-500">Photos</span></button>
-                <button data-format="image/webp" class="format-btn h-[72px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 flex flex-col items-start p-3 text-left hover:border-zinc-300 focus-ring"><span class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300">WEBP</span><span class="mt-auto text-[12px] font-semibold">WebP</span><span class="text-[11px] text-zinc-500">-30% smaller</span></button>
-                <button data-format="image/png" class="format-btn h-[72px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 flex flex-col items-start p-3 text-left hover:border-zinc-300 focus-ring"><span class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 border">PNG</span><span class="mt-auto text-[12px] font-semibold">PNG</span><span class="text-[11px] text-zinc-500">Lossless</span></button>
+            <div><label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500" data-i18n="panel.compress.output">Output • client-side</label>
+              <div class="mt-2 grid grid-cols-3 gap-2">
+                <button data-format="original" class="format-btn active h-[72px] rounded-xl border-[1.5px] border-zinc-900 dark:border-white bg-zinc-50 dark:bg-zinc-900 flex flex-col items-start p-3 text-left focus-ring"><span class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-zinc-900 dark:bg-white text-white dark:text-zinc-900">ORIG</span><span class="mt-auto text-[12px] font-semibold" data-i18n="panel.compress.original">Original</span><span class="text-[11px] text-zinc-500" data-i18n="panel.compress.keep">Keep type</span></button>
+                <button data-format="image/jpeg" class="format-btn h-[72px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 flex flex-col items-start p-3 text-left hover:border-zinc-300 focus-ring"><span class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700">JPG</span><span class="mt-auto text-[12px] font-semibold">JPEG</span><span class="text-[11px] text-zinc-500">MozJPEG</span></button>
+                <button data-format="image/webp" class="format-btn h-[72px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 flex flex-col items-start p-3 text-left hover:border-zinc-300 focus-ring"><span class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-violet-100 dark:bg-violet-900/40 text-violet-700">WEBP</span><span class="mt-auto text-[12px] font-semibold">WebP</span><span class="text-[11px] text-zinc-500">-30%</span></button>
+                <button data-format="image/png" class="format-btn h-[72px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 flex flex-col items-start p-3 text-left hover:border-zinc-300 focus-ring"><span class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 border">PNG</span><span class="mt-auto text-[12px] font-semibold">PNG</span><span class="text-[11px] text-zinc-500" data-i18n="panel.compress.lossless">Lossless</span></button>
+                <button data-format="image/avif" id="avifBtn" class="format-btn h-[72px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 flex flex-col items-start p-3 text-left hover:border-zinc-300 focus-ring"><span class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700">AVIF</span><span class="mt-auto text-[12px] font-semibold">AVIF</span><span class="text-[11px] text-zinc-500" id="avifSupport">Check...</span></button>
+                <button data-format="target" class="format-btn h-[72px] rounded-xl border border-dashed border-zinc-300 dark:border-zinc-600 bg-zinc-50/50 dark:bg-zinc-900 flex flex-col items-start p-3 text-left focus-ring"><span class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-zinc-900 dark:bg-white text-white dark:text-zinc-900">SIZE</span><span class="mt-auto text-[12px] font-semibold" data-i18n="panel.compress.target">Target</span><span class="text-[11px] text-zinc-500" data-i18n="panel.compress.kb">KB</span></button>
               </div>
             </div>
 
-            <div class="rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-3 space-y-2.5">
-              <div class="flex justify-between text-[12px]"><span class="text-zinc-500">Original</span><span id="origSizeLabel" class="font-mono font-medium">—</span></div>
-              <div class="flex justify-between text-[12px]"><span class="text-zinc-500">Compressed</span><span id="compSizeLabel" class="font-mono font-medium text-emerald-600">—</span></div>
-              <div class="h-1.5 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden"><div id="savingsBar" class="h-full bg-emerald-500 transition-all duration-300" style="width:0%"></div></div>
-              <div id="savingsLabel" class="text-[11px] font-medium text-emerald-600">— saved</div>
-            </div>
+            <div id="targetSizeWrap" class="hidden rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 p-3 space-y-2"><label class="text-[11px] font-semibold uppercase tracking-widest text-amber-800 dark:text-amber-200" data-i18n="panel.compress.targetSize">Target file size (KB)</label><div class="flex gap-2"><input id="targetSize" type="number" placeholder="100" class="w-full h-9 px-3 rounded-xl border border-amber-200 dark:border-amber-800 bg-white dark:bg-zinc-900 text-[13px] font-mono"><button id="applyTargetBtn" class="h-9 px-4 rounded-xl bg-amber-600 text-white text-[12px] font-medium">OK</button></div><div class="text-[11px] text-amber-700 dark:text-amber-300" data-i18n="panel.compress.targetDesc">Auto-adjust quality to meet target.</div></div>
+
+            <div class="rounded-xl bg-zinc-50 dark:bg-zinc-900 border p-3 space-y-2.5"><div class="flex justify-between text-[12px]"><span class="text-zinc-500" data-i18n="panel.compress.origLabel">Original</span><span id="origSizeLabel" class="font-mono font-medium">—</span></div><div class="flex justify-between text-[12px]"><span class="text-zinc-500" data-i18n="panel.compress.compLabel">Compressed</span><span id="compSizeLabel" class="font-mono font-medium text-emerald-600">—</span></div><div class="h-1.5 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden"><div id="savingsBar" class="h-full bg-emerald-500 transition-all duration-300" style="width:0%"></div></div><div id="savingsLabel" class="text-[11px] font-medium text-emerald-600">— saved</div><div class="text-[10px] font-mono text-zinc-400">Canvas.toBlob() + WASM pica • <span id="codecInfo">native codecs</span></div></div>
           </div>
         </div>
 
+        <!-- RESIZE - complete with WASM -->
         <div id="panel-resize" class="tool-panel hidden space-y-6">
-          <div><h3 class="text-[13px] font-semibold">Resize</h3><p class="mt-1 text-[12px] text-zinc-500">8pt grid, presets keep aspect.</p></div>
+          <div><h3 class="text-[13px] font-semibold" data-i18n="panel.resize.title">Resize • pica WASM high-quality</h3><p class="mt-1 text-[12px] text-zinc-500" data-i18n="panel.resize.desc">Lanczos3 resampling via pica WASM, not bilinear. Presets + fit modes.</p></div>
           <div class="space-y-4">
-            <div class="grid grid-cols-2 gap-3">
-              <div><label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">Width</label><div class="mt-1.5 flex"><input id="resizeW" type="number" class="w-full h-9 px-3 rounded-l-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[13px] font-mono focus-ring"><span class="h-9 px-2.5 flex items-center rounded-r-xl border border-l-0 border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-[11px] font-mono">px</span></div></div>
-              <div><label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">Height</label><div class="mt-1.5 flex"><input id="resizeH" type="number" class="w-full h-9 px-3 rounded-l-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[13px] font-mono focus-ring"><span class="h-9 px-2.5 flex items-center rounded-r-xl border border-l-0 border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-[11px] font-mono">px</span></div></div>
-            </div>
-            <label class="flex items-center gap-2 text-[12px] cursor-pointer"><input id="lockAspect" type="checkbox" checked class="rounded border-zinc-300"> Lock aspect ratio</label>
-            <div><div class="flex justify-between mb-2"><label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">Scale</label><span id="scaleVal" class="text-[11px] font-mono font-medium">100%</span></div><input id="scaleRange" type="range" min="10" max="200" value="100"></div>
-            <div><label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">Presets</label><div class="mt-2 grid grid-cols-2 gap-1.5">
-              <button data-preset="1920x1080" class="preset-btn h-8 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[11px] font-medium hover:bg-zinc-50">1920×1080 FHD</button>
-              <button data-preset="1280x720" class="preset-btn h-8 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[11px] font-medium">1280×720 HD</button>
-              <button data-preset="1080x1080" class="preset-btn h-8 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[11px] font-medium">1080×1080 IG</button>
-              <button data-preset="1200x628" class="preset-btn h-8 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[11px] font-medium">1200×628 OG</button>
+            <div class="grid grid-cols-2 gap-3"><div><label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500" data-i18n="panel.resize.width">Width</label><div class="mt-1.5 flex"><input id="resizeW" type="number" class="w-full h-9 px-3 rounded-l-xl border bg-white dark:bg-zinc-900 text-[13px] font-mono focus-ring"><span class="h-9 px-2.5 flex items-center rounded-r-xl border border-l-0 bg-zinc-50 dark:bg-zinc-800 text-[11px] font-mono">px</span></div></div><div><label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500" data-i18n="panel.resize.height">Height</label><div class="mt-1.5 flex"><input id="resizeH" type="number" class="w-full h-9 px-3 rounded-l-xl border bg-white dark:bg-zinc-900 text-[13px] font-mono focus-ring"><span class="h-9 px-2.5 flex items-center rounded-r-xl border border-l-0 bg-zinc-50 dark:bg-zinc-800 text-[11px] font-mono">px</span></div></div></div>
+            <label class="flex items-center gap-2 text-[12px] cursor-pointer"><input id="lockAspect" type="checkbox" checked class="rounded"> <span data-i18n="panel.resize.lock">Lock aspect ratio</span></label>
+            <div><div class="flex justify-between mb-2"><label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500" data-i18n="panel.resize.scale">Scale</label><span id="scaleVal" class="text-[11px] font-mono font-medium">100%</span></div><input id="scaleRange" type="range" min="10" max="300" value="100"></div>
+            <div><label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500" data-i18n="panel.resize.presets">Presets</label><div class="mt-2 grid grid-cols-2 gap-1.5">
+              <button data-preset="1920x1080" class="preset-btn h-8 rounded-lg border bg-white dark:bg-zinc-900 text-[11px] font-medium hover:bg-zinc-50">1920×1080 FHD</button>
+              <button data-preset="1280x720" class="preset-btn h-8 rounded-lg border bg-white dark:bg-zinc-900 text-[11px] font-medium">1280×720 HD</button>
+              <button data-preset="1080x1080" class="preset-btn h-8 rounded-lg border bg-white dark:bg-zinc-900 text-[11px] font-medium">1080×1080 IG</button>
+              <button data-preset="1200x628" class="preset-btn h-8 rounded-lg border bg-white dark:bg-zinc-900 text-[11px] font-medium">1200×628 OG</button>
+              <button data-preset="1080x1920" class="preset-btn h-8 rounded-lg border bg-white dark:bg-zinc-900 text-[11px] font-medium">1080×1920 Story</button>
+              <button data-preset="800x600" class="preset-btn h-8 rounded-lg border bg-white dark:bg-zinc-900 text-[11px] font-medium">800×600</button>
             </div></div>
-            <button id="applyResizeBtn" class="w-full h-9 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[13px] font-semibold hover:opacity-90 transition focus-ring">Apply resize</button>
+            <div><label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500" data-i18n="panel.resize.fit">Fit mode • Canvas + WASM</label><div class="mt-2 grid grid-cols-3 gap-1 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-800"><button data-fit="cover" class="fit-btn active h-7 rounded-lg bg-white dark:bg-zinc-700 shadow-sm text-[11px] font-medium">Cover</button><button data-fit="contain" class="fit-btn h-7 rounded-lg text-[11px] font-medium text-zinc-500">Contain</button><button data-fit="stretch" class="fit-btn h-7 rounded-lg text-[11px] font-medium text-zinc-500">Stretch</button></div></div>
+            <div class="grid grid-cols-2 gap-2"><label class="flex items-center gap-2 text-[11px] p-2.5 rounded-xl border bg-zinc-50 dark:bg-zinc-900 cursor-pointer"><input id="noEnlarge" type="checkbox" class="rounded w-3 h-3"><span data-i18n="panel.resize.noEnlarge">Don't enlarge</span></label><div class="flex items-center gap-2 text-[11px] p-2.5 rounded-xl border bg-zinc-50 dark:bg-zinc-900"><span data-i18n="panel.resize.bg">BG</span><input id="resizeBg" type="color" value="#ffffff" class="w-6 h-6 rounded border p-0.5 bg-white"></div></div>
+            <div class="rounded-xl bg-violet-50 dark:bg-violet-950/20 border border-violet-200 dark:border-violet-800 p-2.5 text-[11px] text-violet-700 dark:text-violet-300"><span class="font-semibold">WASM:</span> <span data-i18n="panel.resize.wasm">pica uses Lanczos + WASM for high-quality resize, better than canvas bilinear.</span> <span id="picaStatus" class="font-mono">loading...</span></div>
+            <button id="applyResizeBtn" class="w-full h-9 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[13px] font-semibold hover:opacity-90 focus-ring" data-i18n="panel.resize.apply">Apply resize • WASM</button>
           </div>
         </div>
 
+        <!-- CONVERT - complete -->
         <div id="panel-convert" class="tool-panel hidden space-y-6">
-          <div><h3 class="text-[13px] font-semibold">Convert</h3><p class="mt-1 text-[12px] text-zinc-500">Batch supported, keeps transparency for PNG/WebP.</p></div>
+          <div><h3 class="text-[13px] font-semibold" data-i18n="panel.convert.title">Convert • Client-side codecs</h3><p class="mt-1 text-[12px] text-zinc-500" data-i18n="panel.convert.desc">Canvas.toBlob() native + AVIF detection, BG for JPG, batch ZIP.</p></div>
           <div class="space-y-3">
-            <button data-cformat="image/jpeg" class="cformat-btn active w-full flex items-center gap-3 p-3 rounded-xl border-[1.5px] border-zinc-900 dark:border-white bg-zinc-50 dark:bg-zinc-900 text-left focus-ring"><div class="w-9 h-9 rounded-lg bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center text-[11px] font-bold text-amber-700 dark:text-amber-300">JPG</div><div class="text-left"><div class="text-[13px] font-medium">JPEG</div><div class="text-[11px] text-zinc-500">Best for photos</div></div><span class="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-medium">Lossy</span></button>
-            <button data-cformat="image/png" class="cformat-btn w-full flex items-center gap-3 p-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-left hover:border-zinc-300 focus-ring"><div class="w-9 h-9 rounded-lg bg-zinc-100 dark:bg-zinc-800 border flex items-center justify-center text-[11px] font-bold">PNG</div><div class="text-left"><div class="text-[13px] font-medium">PNG</div><div class="text-[11px] text-zinc-500">Transparency</div></div></button>
-            <button data-cformat="image/webp" class="cformat-btn w-full flex items-center gap-3 p-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-left hover:border-zinc-300 focus-ring"><div class="w-9 h-9 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center text-[11px] font-bold text-violet-700 dark:text-violet-300">WEBP</div><div class="text-left"><div class="text-[13px] font-medium">WebP</div><div class="text-[11px] text-zinc-500">Modern, smaller</div></div><span class="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-violet-50 dark:bg-violet-950 border border-violet-200 dark:border-violet-800 text-violet-700 dark:text-violet-300">Rec</span></button>
+            <button data-cformat="image/jpeg" class="cformat-btn active w-full flex items-center gap-3 p-3 rounded-xl border-[1.5px] border-zinc-900 dark:border-white bg-zinc-50 dark:bg-zinc-900 text-left focus-ring"><div class="w-9 h-9 rounded-lg bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center text-[11px] font-bold text-amber-700">JPG</div><div class="text-left"><div class="text-[13px] font-medium">JPEG</div><div class="text-[11px] text-zinc-500" data-i18n="panel.convert.jpgDesc">Best for photos • MozJPEG</div></div><span class="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-medium">Lossy</span></button>
+            <button data-cformat="image/png" class="cformat-btn w-full flex items-center gap-3 p-3 rounded-xl border bg-white dark:bg-zinc-900 text-left hover:border-zinc-300 focus-ring"><div class="w-9 h-9 rounded-lg bg-zinc-100 dark:bg-zinc-800 border flex items-center justify-center text-[11px] font-bold">PNG</div><div class="text-left"><div class="text-[13px] font-medium">PNG</div><div class="text-[11px] text-zinc-500" data-i18n="panel.convert.pngDesc">Transparency • Lossless</div></div></button>
+            <button data-cformat="image/webp" class="cformat-btn w-full flex items-center gap-3 p-3 rounded-xl border bg-white dark:bg-zinc-900 text-left hover:border-zinc-300 focus-ring"><div class="w-9 h-9 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center text-[11px] font-bold text-violet-700">WEBP</div><div class="text-left"><div class="text-[13px] font-medium">WebP</div><div class="text-[11px] text-zinc-500" data-i18n="panel.convert.webpDesc">Modern • -30% smaller</div></div><span class="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-violet-50 dark:bg-violet-950 border border-violet-200 dark:border-violet-800 text-violet-700">Rec</span></button>
+            <button data-cformat="image/avif" id="cAvifBtn" class="cformat-btn w-full flex items-center gap-3 p-3 rounded-xl border bg-white dark:bg-zinc-900 text-left hover:border-zinc-300 focus-ring"><div class="w-9 h-9 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-[11px] font-bold text-emerald-700">AVIF</div><div class="text-left"><div class="text-[13px] font-medium">AVIF</div><div class="text-[11px] text-zinc-500" id="cAvifSupport">Detecting...</div></div></button>
           </div>
-          <div id="convertQualityWrap"><div class="flex justify-between mb-2"><label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">Quality</label><span id="cQualityVal" class="text-[11px] font-mono">85%</span></div><input id="cQualityRange" type="range" min="1" max="100" value="85"></div>
-          <button id="applyConvertBtn" class="w-full h-9 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[13px] font-semibold focus-ring">Convert & download</button>
+          <div id="convertQualityWrap"><div class="flex justify-between mb-2"><label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500" data-i18n="panel.convert.quality">Quality</label><span id="cQualityVal" class="text-[11px] font-mono">85%</span></div><input id="cQualityRange" type="range" min="1" max="100" value="85"></div>
+          <div><label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500" data-i18n="panel.convert.bg">Background for JPG (transparent → color)</label><div class="mt-2 flex items-center gap-2"><input id="convertBg" type="color" value="#ffffff" class="w-9 h-9 rounded-xl border p-1 bg-white dark:bg-zinc-900"><span class="text-[11px] text-zinc-500" data-i18n="panel.convert.bgDesc">White for JPG, transparent kept for PNG/WebP/AVIF</span></div></div>
+          <div class="rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 p-2.5 text-[11px] text-amber-800 dark:text-amber-200" data-i18n="panel.convert.warn">⚠️ JPG has no transparency. Transparent areas become BG color.</div>
+          <button id="applyConvertBtn" class="w-full h-9 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[13px] font-semibold focus-ring" data-i18n="panel.convert.apply">Convert & download • Canvas</button>
         </div>
 
         <div id="panel-crop" class="tool-panel hidden space-y-6">
-          <div><h3 class="text-[13px] font-semibold">Crop</h3><p class="mt-1 text-[12px] text-zinc-500">Drag box, handles for resize. Squoosh-style grid.</p></div>
-          <div class="grid grid-cols-3 gap-1.5">
-            <button data-ratio="free" class="ratio-btn active h-8 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[11px] font-medium">Free</button>
-            <button data-ratio="1:1" class="ratio-btn h-8 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[11px]">1:1</button>
-            <button data-ratio="4:3" class="ratio-btn h-8 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[11px]">4:3</button>
-            <button data-ratio="16:9" class="ratio-btn h-8 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[11px]">16:9</button>
-            <button data-ratio="3:2" class="ratio-btn h-8 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[11px]">3:2</button>
-            <button data-ratio="9:16" class="ratio-btn h-8 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[11px]">9:16</button>
-          </div>
+          <div><h3 class="text-[13px] font-semibold" data-i18n="panel.crop.title">Crop</h3><p class="mt-1 text-[12px] text-zinc-500" data-i18n="panel.crop.desc">Drag box, handles for resize.</p></div>
+          <div class="grid grid-cols-3 gap-1.5"><button data-ratio="free" class="ratio-btn active h-8 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[11px] font-medium">Free</button><button data-ratio="1:1" class="ratio-btn h-8 rounded-lg border bg-white dark:bg-zinc-900 text-[11px]">1:1</button><button data-ratio="4:3" class="ratio-btn h-8 rounded-lg border bg-white dark:bg-zinc-900 text-[11px]">4:3</button><button data-ratio="16:9" class="ratio-btn h-8 rounded-lg border bg-white dark:bg-zinc-900 text-[11px]">16:9</button><button data-ratio="3:2" class="ratio-btn h-8 rounded-lg border bg-white dark:bg-zinc-900 text-[11px]">3:2</button><button data-ratio="9:16" class="ratio-btn h-8 rounded-lg border bg-white dark:bg-zinc-900 text-[11px]">9:16</button></div>
           <div class="grid grid-cols-2 gap-2 text-[11px] font-mono"><div class="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border">X <span id="cropX">0</span> Y <span id="cropY">0</span></div><div class="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border">W <span id="cropW">0</span> H <span id="cropH">0</span></div></div>
-          <div class="flex gap-2"><button id="cropCancelBtn" class="flex-1 h-8 rounded-full border border-zinc-200 dark:border-zinc-700 text-[12px] font-medium">Cancel</button><button id="cropApplyBtn" class="flex-1 h-8 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[12px] font-medium">Apply</button></div>
+          <div class="flex gap-2"><button id="cropCancelBtn" class="flex-1 h-8 rounded-full border text-[12px] font-medium" data-i18n="panel.crop.cancel">Cancel</button><button id="cropApplyBtn" class="flex-1 h-8 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[12px] font-medium" data-i18n="panel.crop.apply">Apply</button></div>
         </div>
 
         <div id="panel-rotate" class="tool-panel hidden space-y-6">
-          <div><h3 class="text-[13px] font-semibold">Rotate & Flip</h3></div>
-          <div class="grid grid-cols-2 gap-2">
-            <button id="rotLeftBtn" class="h-[64px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 flex flex-col items-center justify-center gap-1 hover:bg-zinc-50 text-[11px] font-medium focus-ring"><i data-lucide="rotate-ccw" class="w-4 h-4"></i>Left 90°</button>
-            <button id="rotRightBtn" class="h-[64px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 flex flex-col items-center justify-center gap-1 hover:bg-zinc-50 text-[11px] font-medium focus-ring"><i data-lucide="rotate-cw" class="w-4 h-4"></i>Right 90°</button>
-            <button id="flipHBtn" class="h-[64px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 flex flex-col items-center justify-center gap-1 hover:bg-zinc-50 text-[11px] font-medium focus-ring"><i data-lucide="flip-horizontal" class="w-4 h-4"></i>Flip H</button>
-            <button id="flipVBtn" class="h-[64px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 flex flex-col items-center justify-center gap-1 hover:bg-zinc-50 text-[11px] font-medium focus-ring"><i data-lucide="flip-vertical" class="w-4 h-4"></i>Flip V</button>
-          </div>
-          <div><div class="flex justify-between mb-2"><label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">Straighten</label><span id="straightenVal" class="text-[11px] font-mono">0°</span></div><input id="straightenRange" type="range" min="-45" max="45" value="0"></div>
-          <button id="applyRotateBtn" class="w-full h-9 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[13px] font-semibold focus-ring">Apply straighten</button>
+          <div><h3 class="text-[13px] font-semibold" data-i18n="panel.rotate.title">Rotate & Flip</h3></div>
+          <div class="grid grid-cols-2 gap-2"><button id="rotLeftBtn" class="h-[64px] rounded-xl border bg-white dark:bg-zinc-900 flex flex-col items-center justify-center gap-1 hover:bg-zinc-50 text-[11px] font-medium focus-ring"><i data-lucide="rotate-ccw" class="w-4 h-4"></i><span data-i18n="panel.rotate.left">Left 90°</span></button><button id="rotRightBtn" class="h-[64px] rounded-xl border bg-white dark:bg-zinc-900 flex flex-col items-center justify-center gap-1 hover:bg-zinc-50 text-[11px] font-medium focus-ring"><i data-lucide="rotate-cw" class="w-4 h-4"></i><span data-i18n="panel.rotate.right">Right 90°</span></button><button id="flipHBtn" class="h-[64px] rounded-xl border bg-white dark:bg-zinc-900 flex flex-col items-center justify-center gap-1 hover:bg-zinc-50 text-[11px] font-medium focus-ring"><i data-lucide="flip-horizontal" class="w-4 h-4"></i>Flip H</button><button id="flipVBtn" class="h-[64px] rounded-xl border bg-white dark:bg-zinc-900 flex flex-col items-center justify-center gap-1 hover:bg-zinc-50 text-[11px] font-medium focus-ring"><i data-lucide="flip-vertical" class="w-4 h-4"></i>Flip V</button></div>
+          <div><div class="flex justify-between mb-2"><label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500" data-i18n="panel.rotate.straighten">Straighten</label><span id="straightenVal" class="text-[11px] font-mono">0°</span></div><input id="straightenRange" type="range" min="-45" max="45" value="0"></div>
+          <button id="applyRotateBtn" class="w-full h-9 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[13px] font-semibold focus-ring" data-i18n="panel.rotate.apply">Apply straighten</button>
         </div>
 
         <div id="panel-adjust" class="tool-panel hidden space-y-5">
-          <div><h3 class="text-[13px] font-semibold">Adjust</h3><p class="mt-1 text-[12px] text-zinc-500">Live preview via Canvas filter.</p></div>
-          <div class="space-y-4">
-            <div><div class="flex justify-between mb-1.5"><label class="text-[11px] font-medium">Brightness</label><span id="bVal" class="text-[11px] font-mono">100%</span></div><input data-filter="brightness" type="range" min="0" max="200" value="100" class="filter-range"></div>
-            <div><div class="flex justify-between mb-1.5"><label class="text-[11px] font-medium">Contrast</label><span id="cVal" class="text-[11px] font-mono">100%</span></div><input data-filter="contrast" type="range" min="0" max="200" value="100" class="filter-range"></div>
-            <div><div class="flex justify-between mb-1.5"><label class="text-[11px] font-medium">Saturation</label><span id="sVal" class="text-[11px] font-mono">100%</span></div><input data-filter="saturate" type="range" min="0" max="200" value="100" class="filter-range"></div>
-            <div><div class="flex justify-between mb-1.5"><label class="text-[11px] font-medium">Blur</label><span id="blVal" class="text-[11px] font-mono">0px</span></div><input data-filter="blur" type="range" min="0" max="10" value="0" step="0.1" class="filter-range"></div>
-            <div><div class="flex justify-between mb-1.5"><label class="text-[11px] font-medium">Hue</label><span id="hVal" class="text-[11px] font-mono">0°</span></div><input data-filter="hue" type="range" min="0" max="360" value="0" class="filter-range"></div>
-            <div class="grid grid-cols-3 gap-1.5">
-              <label class="flex items-center justify-center gap-1.5 h-8 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-[11px] cursor-pointer"><input data-filter="grayscale" type="checkbox" class="filter-check w-3 h-3"> Gray</label>
-              <label class="flex items-center justify-center gap-1.5 h-8 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-[11px] cursor-pointer"><input data-filter="sepia" type="checkbox" class="filter-check w-3 h-3"> Sepia</label>
-              <label class="flex items-center justify-center gap-1.5 h-8 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-[11px] cursor-pointer"><input data-filter="invert" type="checkbox" class="filter-check w-3 h-3"> Invert</label>
-            </div>
-            <div class="flex gap-2"><button id="clearFiltersBtn" class="flex-1 h-8 rounded-full border border-zinc-200 dark:border-zinc-700 text-[12px]">Clear</button><button id="applyFiltersBtn" class="flex-1 h-8 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[12px] font-medium">Apply</button></div>
-          </div>
+          <div><h3 class="text-[13px] font-semibold" data-i18n="panel.adjust.title">Adjust</h3><p class="mt-1 text-[12px] text-zinc-500" data-i18n="panel.adjust.desc">Live preview via Canvas filter.</p></div>
+          <div class="space-y-4"><div><div class="flex justify-between mb-1.5"><label class="text-[11px] font-medium" data-i18n="panel.adjust.bright">Brightness</label><span id="bVal" class="text-[11px] font-mono">100%</span></div><input data-filter="brightness" type="range" min="0" max="200" value="100" class="filter-range"></div><div><div class="flex justify-between mb-1.5"><label class="text-[11px] font-medium" data-i18n="panel.adjust.contrast">Contrast</label><span id="cVal" class="text-[11px] font-mono">100%</span></div><input data-filter="contrast" type="range" min="0" max="200" value="100" class="filter-range"></div><div><div class="flex justify-between mb-1.5"><label class="text-[11px] font-medium" data-i18n="panel.adjust.sat">Saturation</label><span id="sVal" class="text-[11px] font-mono">100%</span></div><input data-filter="saturate" type="range" min="0" max="200" value="100" class="filter-range"></div><div><div class="flex justify-between mb-1.5"><label class="text-[11px] font-medium" data-i18n="panel.adjust.blur">Blur</label><span id="blVal" class="text-[11px] font-mono">0px</span></div><input data-filter="blur" type="range" min="0" max="10" value="0" step="0.1" class="filter-range"></div><div><div class="flex justify-between mb-1.5"><label class="text-[11px] font-medium" data-i18n="panel.adjust.hue">Hue</label><span id="hVal" class="text-[11px] font-mono">0°</span></div><input data-filter="hue" type="range" min="0" max="360" value="0" class="filter-range"></div><div class="grid grid-cols-3 gap-1.5"><label class="flex items-center justify-center gap-1.5 h-8 rounded-lg border bg-zinc-50 dark:bg-zinc-900 text-[11px] cursor-pointer"><input data-filter="grayscale" type="checkbox" class="filter-check w-3 h-3"> <span data-i18n="panel.adjust.gray">Gray</span></label><label class="flex items-center justify-center gap-1.5 h-8 rounded-lg border bg-zinc-50 dark:bg-zinc-900 text-[11px] cursor-pointer"><input data-filter="sepia" type="checkbox" class="filter-check w-3 h-3"> Sepia</label><label class="flex items-center justify-center gap-1.5 h-8 rounded-lg border bg-zinc-50 dark:bg-zinc-900 text-[11px] cursor-pointer"><input data-filter="invert" type="checkbox" class="filter-check w-3 h-3"> Invert</label></div><div class="flex gap-2"><button id="clearFiltersBtn" class="flex-1 h-8 rounded-full border text-[12px]" data-i18n="panel.adjust.clear">Clear</button><button id="applyFiltersBtn" class="flex-1 h-8 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[12px] font-medium" data-i18n="panel.adjust.apply">Apply</button></div></div>
         </div>
 
         <div id="panel-watermark" class="tool-panel hidden space-y-5">
-          <div><h3 class="text-[13px] font-semibold">Watermark</h3></div>
-          <div class="space-y-4">
-            <div><label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">Text</label><input id="wmText" type="text" placeholder="© Brand" class="mt-1.5 w-full h-9 px-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[13px] focus-ring"></div>
-            <div class="grid grid-cols-2 gap-3"><div><label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">Size</label><input id="wmSize" type="range" min="10" max="120" value="36" class="mt-2"><div class="text-[11px] font-mono mt-1"><span id="wmSizeVal">36</span>px</div></div><div><label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">Opacity</label><input id="wmOpacity" type="range" min="10" max="100" value="60" class="mt-2"><div class="text-[11px] font-mono mt-1"><span id="wmOpacityVal">60</span>%</div></div></div>
-            <div class="grid grid-cols-2 gap-3"><div><label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">Color</label><input id="wmColor" type="color" value="#ffffff" class="mt-1.5 w-full h-9 rounded-xl border border-zinc-200 dark:border-zinc-700 p-1 bg-white dark:bg-zinc-900"></div><div><label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">Position</label><div class="mt-1.5 grid grid-cols-3 gap-1"><button data-pos="tl" class="wm-pos h-7 rounded-lg border bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[10px]">TL</button><button data-pos="tc" class="wm-pos h-7 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[10px]">TC</button><button data-pos="tr" class="wm-pos h-7 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[10px]">TR</button><button data-pos="ml" class="wm-pos h-7 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[10px]">ML</button><button data-pos="mc" class="wm-pos h-7 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[10px]">MC</button><button data-pos="mr" class="wm-pos h-7 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[10px]">MR</button><button data-pos="bl" class="wm-pos h-7 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[10px]">BL</button><button data-pos="bc" class="wm-pos h-7 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[10px]">BC</button><button data-pos="br" class="wm-pos active h-7 rounded-lg border bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[10px]">BR</button></div></div></div>
-            <button id="applyWmBtn" class="w-full h-9 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[13px] font-semibold focus-ring">Apply watermark</button>
-          </div>
+          <div><h3 class="text-[13px] font-semibold" data-i18n="panel.wm.title">Watermark</h3></div>
+          <div class="space-y-4"><div><label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500" data-i18n="panel.wm.text">Text</label><input id="wmText" type="text" placeholder="© Brand" class="mt-1.5 w-full h-9 px-3 rounded-xl border bg-white dark:bg-zinc-900 text-[13px] focus-ring"></div><div class="grid grid-cols-2 gap-3"><div><label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500" data-i18n="panel.wm.size">Size</label><input id="wmSize" type="range" min="10" max="120" value="36" class="mt-2"><div class="text-[11px] font-mono mt-1"><span id="wmSizeVal">36</span>px</div></div><div><label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500" data-i18n="panel.wm.opacity">Opacity</label><input id="wmOpacity" type="range" min="10" max="100" value="60" class="mt-2"><div class="text-[11px] font-mono mt-1"><span id="wmOpacityVal">60</span>%</div></div></div><div class="grid grid-cols-2 gap-3"><div><label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500" data-i18n="panel.wm.color">Color</label><input id="wmColor" type="color" value="#ffffff" class="mt-1.5 w-full h-9 rounded-xl border p-1 bg-white dark:bg-zinc-900"></div><div><label class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500" data-i18n="panel.wm.pos">Position</label><div class="mt-1.5 grid grid-cols-3 gap-1"><button data-pos="tl" class="wm-pos h-7 rounded-lg border bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[10px]">TL</button><button data-pos="tc" class="wm-pos h-7 rounded-lg border bg-white dark:bg-zinc-900 text-[10px]">TC</button><button data-pos="tr" class="wm-pos h-7 rounded-lg border bg-white dark:bg-zinc-900 text-[10px]">TR</button><button data-pos="ml" class="wm-pos h-7 rounded-lg border bg-white dark:bg-zinc-900 text-[10px]">ML</button><button data-pos="mc" class="wm-pos h-7 rounded-lg border bg-white dark:bg-zinc-900 text-[10px]">MC</button><button data-pos="mr" class="wm-pos h-7 rounded-lg border bg-white dark:bg-zinc-900 text-[10px]">MR</button><button data-pos="bl" class="wm-pos h-7 rounded-lg border bg-white dark:bg-zinc-900 text-[10px]">BL</button><button data-pos="bc" class="wm-pos h-7 rounded-lg border bg-white dark:bg-zinc-900 text-[10px]">BC</button><button data-pos="br" class="wm-pos active h-7 rounded-lg border bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[10px]">BR</button></div></div></div><button id="applyWmBtn" class="w-full h-9 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[13px] font-semibold focus-ring" data-i18n="panel.wm.apply">Apply watermark</button></div>
         </div>
 
-        <div class="pt-6 border-t border-zinc-200 dark:border-zinc-800">
-          <div class="rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 p-3.5 flex gap-2.5">
-            <div class="w-7 h-7 rounded-lg bg-white/10 dark:bg-zinc-900/10 flex items-center justify-center flex-shrink-0"><i data-lucide="lightbulb" class="w-3.5 h-3.5"></i></div>
-            <div class="text-[11px] leading-[1.5]"><span class="font-semibold">Pro tip:</span> Squoosh best practice — use split compare to spot artifacts. Press <kbd class="px-1 py-0.5 rounded bg-white/20 font-mono text-[10px]">C</kbd> to toggle, <kbd class="px-1 py-0.5 rounded bg-white/20 font-mono text-[10px]">⌘Z</kbd> undo.</div>
-          </div>
-        </div>
+        <div class="pt-6 border-t border-zinc-200 dark:border-zinc-800"><div class="rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 p-3.5 flex gap-2.5"><div class="w-7 h-7 rounded-lg bg-white/10 dark:bg-zinc-900/10 flex items-center justify-center flex-shrink-0"><i data-lucide="lightbulb" class="w-3.5 h-3.5"></i></div><div class="text-[11px] leading-[1.5]"><span class="font-semibold" data-i18n="tip.title">Pro tip:</span> <span data-i18n="tip.desc">Squoosh best practice — use split compare to spot artifacts. Press C to toggle, ⌘Z undo.</span></div></div></div>
       </div>
     </aside>
   </div>
 </div>
 
-<footer id="mainFooter" class="border-t border-zinc-200 dark:border-zinc-800 mt-12 bg-white dark:bg-zinc-950">
-  <div class="max-w-[1280px] mx-auto px-4 md:px-6 py-10">
-    <div class="grid md:grid-cols-3 gap-8 text-[12px] leading-[1.6]">
-      <div><div class="font-semibold text-[13px]">Design system</div><div class="mt-2 text-zinc-500">8pt grid, Inter + Geist Mono, zinc neutrals + single violet accent, 12px radius, 150ms ease, WCAG AA+, focus-ring, shadcn card. Inspired by Linear, Stripe, Squoosh.</div></div>
-      <div><div class="font-semibold text-[13px]">Privacy</div><div class="mt-2 text-zinc-500">Canvas API + toBlob() local only. No upload, no cookies. JSZip for batch. Works offline after first load. Open source.</div></div>
-      <div><div class="font-semibold text-[13px]">Stack</div><div class="mt-2 text-zinc-500">Tailwind CDN, Lucide icons, vanilla JS. No build step. Static single-page, fast by default.</div></div>
-    </div>
-    <div class="mt-8 pt-6 border-t border-zinc-100 dark:border-zinc-800 flex justify-between text-[11px] font-mono text-zinc-400"><span>© 2026 imgtool.studio — v2.1 design-system</span><span>local • private • no tracking</span></div>
-  </div>
-</footer>
+<footer id="mainFooter" class="border-t border-zinc-200 dark:border-zinc-800 mt-12 bg-white dark:bg-zinc-950"><div class="max-w-[1280px] mx-auto px-4 md:px-6 py-10"><div class="grid md:grid-cols-3 gap-8 text-[12px] leading-[1.6]"><div><div class="font-semibold text-[13px]" data-i18n="footer.design">Design system</div><div class="mt-2 text-zinc-500" data-i18n="footer.designDesc">8pt grid, Inter + Geist Mono, zinc + violet, 12px radius, WCAG AA+, Canvas+WASM, multi-language.</div></div><div><div class="font-semibold text-[13px]" data-i18n="footer.privacy">Privacy</div><div class="mt-2 text-zinc-500" data-i18n="footer.privacyDesc">Canvas API + pica WASM local only. No upload, no cookies. JSZip for batch. Works offline.</div></div><div><div class="font-semibold text-[13px]" data-i18n="footer.stack">Stack</div><div class="mt-2 text-zinc-500" data-i18n="footer.stackDesc">Tailwind CDN, Lucide, pica WASM, vanilla JS. Static single-page, 7 languages.</div></div></div><div class="mt-8 pt-6 border-t border-zinc-100 dark:border-zinc-800 flex justify-between text-[11px] font-mono text-zinc-400"><span data-i18n="footer.copy">© 2026 imgtool.studio — v3.0 Canvas+WASM + i18n</span><span data-i18n="footer.tag">local • private • multi-lang</span></div></div></footer>
 
 <script>
-/* lucide init */
+// lucide
 lucide.createIcons();
-/* ============ State ============ */
+
+// ==================== i18n - 7 languages ====================
+const translations = {
+  en: {
+    "header.local_private":"Local • Private", "header.no_upload":"No upload • Offline • Canvas+WASM", "header.paste":"paste", "header.compare":"compare", "header.pasteBtn":"Paste",
+    "hero.badge":"Canvas + WASM • No upload • Multi-language", "hero.title1":"Image tools that", "hero.title2":"stay on your device.", "hero.desc":"Compress, resize, convert — 100% in browser via Canvas API + pica WASM. No server, no tracking. Now in 7 languages.",
+    "drop.title":"Drop images here", "drop.subtitle":"or click to browse • drag from Figma • paste anywhere", "drop.choose":"Choose files", "drop.max":"Max 50MB • Works offline • pica WASM for resize", "drop.try":"Try",
+    "sample.landscape":"Landscape", "sample.portrait":"Portrait", "sample.product":"Product",
+    "feat.compress.title":"Compress • Canvas + WASM", "feat.compress.desc":"Quality slider, WebP/AVIF with native codecs, PNG lossless, target size, real-time savings, split compare.", "feat.compress.orig":"Original", "feat.compress.save":"-78% smaller",
+    "feat.resize.title":"Resize • pica WASM", "feat.resize.desc":"High-quality Lanczos via pica WASM, aspect lock, scale %, presets (FHD, IG, OG), fit modes, no enlarge, BG color.",
+    "feat.convert.title":"Convert • Multi-format", "feat.convert.desc":"JPG ↔ PNG ↔ WebP ↔ AVIF (if supported), keep transparency, BG for JPG, batch ZIP, multi-language UI.",
+    "toolbar.compare":"Compare", "toolbar.reset":"Reset", "toolbar.download":"Download",
+    "compare.original":"Original", "compare.edited":"Edited", "compare.live":"Live preview",
+    "batch.title":"Batch", "batch.clear":"Clear",
+    "panel.compress.title":"Compression • Canvas + WASM", "panel.compress.desc":"Real-time size, MozJPEG/WebP/AVIF via native + WASM fallback.", "panel.compress.quality":"Quality", "panel.compress.smaller":"smaller", "panel.compress.higher":"higher quality", "panel.compress.output":"Output • client-side", "panel.compress.original":"Original", "panel.compress.keep":"Keep type", "panel.compress.lossless":"Lossless", "panel.compress.target":"Target", "panel.compress.kb":"KB", "panel.compress.targetSize":"Target file size (KB)", "panel.compress.targetDesc":"Auto-adjust quality to meet target.", "panel.compress.origLabel":"Original", "panel.compress.compLabel":"Compressed",
+    "panel.resize.title":"Resize • pica WASM high-quality", "panel.resize.desc":"Lanczos3 resampling via pica WASM, not bilinear. Presets + fit modes.", "panel.resize.width":"Width", "panel.resize.height":"Height", "panel.resize.lock":"Lock aspect ratio", "panel.resize.scale":"Scale", "panel.resize.presets":"Presets", "panel.resize.fit":"Fit mode • Canvas + WASM", "panel.resize.noEnlarge":"Don't enlarge", "panel.resize.bg":"BG", "panel.resize.wasm":"pica uses Lanczos + WASM for high-quality resize, better than canvas bilinear.", "panel.resize.apply":"Apply resize • WASM",
+    "panel.convert.title":"Convert • Client-side codecs", "panel.convert.desc":"Canvas.toBlob() native + AVIF detection, BG for JPG, batch ZIP.", "panel.convert.jpgDesc":"Best for photos • MozJPEG", "panel.convert.pngDesc":"Transparency • Lossless", "panel.convert.webpDesc":"Modern • -30% smaller", "panel.convert.quality":"Quality", "panel.convert.bg":"Background for JPG (transparent → color)", "panel.convert.bgDesc":"White for JPG, transparent kept for PNG/WebP/AVIF", "panel.convert.warn":"⚠️ JPG has no transparency. Transparent areas become BG color.", "panel.convert.apply":"Convert & download • Canvas",
+    "panel.crop.title":"Crop", "panel.crop.desc":"Drag box, handles for resize.", "panel.crop.cancel":"Cancel", "panel.crop.apply":"Apply",
+    "panel.rotate.title":"Rotate & Flip", "panel.rotate.left":"Left 90°", "panel.rotate.right":"Right 90°", "panel.rotate.straighten":"Straighten", "panel.rotate.apply":"Apply straighten",
+    "panel.adjust.title":"Adjust", "panel.adjust.desc":"Live preview via Canvas filter.", "panel.adjust.bright":"Brightness", "panel.adjust.contrast":"Contrast", "panel.adjust.sat":"Saturation", "panel.adjust.blur":"Blur", "panel.adjust.hue":"Hue", "panel.adjust.gray":"Gray", "panel.adjust.clear":"Clear", "panel.adjust.apply":"Apply",
+    "panel.wm.title":"Watermark", "panel.wm.text":"Text", "panel.wm.size":"Size", "panel.wm.opacity":"Opacity", "panel.wm.color":"Color", "panel.wm.pos":"Position", "panel.wm.apply":"Apply watermark",
+    "tip.title":"Pro tip:", "tip.desc":"Squoosh best practice — use split compare to spot artifacts. Press C to toggle, ⌘Z undo.",
+    "footer.design":"Design system", "footer.designDesc":"8pt grid, Inter + Geist Mono, zinc + violet, 12px radius, WCAG AA+, Canvas+WASM, multi-language.", "footer.privacy":"Privacy", "footer.privacyDesc":"Canvas API + pica WASM local only. No upload, no cookies. JSZip for batch. Works offline.", "footer.stack":"Stack", "footer.stackDesc":"Tailwind CDN, Lucide, pica WASM, vanilla JS. Static single-page, 7 languages.", "footer.copy":"© 2026 imgtool.studio — v3.0 Canvas+WASM + i18n", "footer.tag":"local • private • multi-lang"
+  },
+  hi: {
+    "header.local_private":"लोकल • प्राइवेट", "header.no_upload":"अपलोड नहीं • ऑफलाइन • Canvas+WASM", "header.paste":"पेस्ट", "header.compare":"तुलना", "header.pasteBtn":"पेस्ट करें",
+    "hero.badge":"Canvas + WASM • कोई अपलोड नहीं • बहुभाषी", "hero.title1":"इमेज टूल्स जो", "hero.title2":"आपके डिवाइस पर रहते हैं।", "hero.desc":"कंप्रेस, रीसाइज, कन्वर्ट — 100% ब्राउज़र में Canvas + pica WASM से। कोई सर्वर नहीं, 7 भाषाओं में।",
+    "drop.title":"इमेज यहाँ ड्रॉप करें", "drop.subtitle":"या ब्राउज़ करें • Figma से ड्रैग करें • कहीं भी पेस्ट करें", "drop.choose":"फाइल चुनें", "drop.max":"अधिकतम 50MB • ऑफलाइन काम करता है • रीसाइज के लिए WASM", "drop.try":"कोशिश करें",
+    "sample.landscape":"लैंडस्केप", "sample.portrait":"पोर्ट्रेट", "sample.product":"प्रोडक्ट",
+    "feat.compress.title":"कंप्रेस • Canvas + WASM", "feat.compress.desc":"क्वालिटी स्लाइडर, WebP/AVIF, PNG लॉसलेस, टारगेट साइज़, रीयल-टाइम बचत।", "feat.compress.orig":"ओरिजिनल", "feat.compress.save":"-78% छोटा",
+    "feat.resize.title":"रीसाइज • pica WASM", "feat.resize.desc":"pica WASM से उच्च गुणवत्ता Lanczos, एस्पेक्ट लॉक, स्केल, प्रीसेट, फिट मोड।",
+    "feat.convert.title":"कन्वर्ट • मल्टी-फॉर्मेट", "feat.convert.desc":"JPG ↔ PNG ↔ WebP ↔ AVIF, ट्रांसपेरेंसी, JPG के लिए BG, बैच ZIP, बहुभाषी।",
+    "toolbar.compare":"तुलना", "toolbar.reset":"रीसेट", "toolbar.download":"डाउनलोड",
+    "compare.original":"ओरिजिनल", "compare.edited":"एडिटेड", "compare.live":"लाइव प्रीव्यू",
+    "batch.title":"बैच", "batch.clear":"साफ़ करें",
+    "panel.compress.title":"कंप्रेशन • Canvas + WASM", "panel.compress.desc":"रीयल-टाइम साइज़, MozJPEG/WebP/AVIF।", "panel.compress.quality":"क्वालिटी", "panel.compress.smaller":"छोटा", "panel.compress.higher":"बेहतर क्वालिटी", "panel.compress.output":"आउटपुट • क्लाइंट-साइड", "panel.compress.original":"ओरिजिनल", "panel.compress.keep":"टाइप रखें", "panel.compress.lossless":"लॉसलेस", "panel.compress.target":"टारगेट", "panel.compress.kb":"KB", "panel.compress.targetSize":"टारगेट फाइल साइज़ (KB)", "panel.compress.targetDesc":"टारगेट पूरा करने के लिए क्वालिटी ऑटो-एडजस्ट।", "panel.compress.origLabel":"ओरिजिनल", "panel.compress.compLabel":"कंप्रेस्ड",
+    "panel.resize.title":"रीसाइज • pica WASM उच्च गुणवत्ता", "panel.resize.desc":"pica WASM से Lanczos3, बिलीनियर नहीं।", "panel.resize.width":"चौड़ाई", "panel.resize.height":"ऊंचाई", "panel.resize.lock":"एस्पेक्ट लॉक", "panel.resize.scale":"स्केल", "panel.resize.presets":"प्रीसेट", "panel.resize.fit":"फिट मोड", "panel.resize.noEnlarge":"बड़ा न करें", "panel.resize.bg":"BG", "panel.resize.wasm":"pica WASM उच्च गुणवत्ता रीसाइज के लिए Lanczos का उपयोग करता है।", "panel.resize.apply":"रीसाइज लागू करें • WASM",
+    "panel.convert.title":"कन्वर्ट • क्लाइंट-साइड कोडेक", "panel.convert.desc":"Canvas.toBlob() नेटिव + AVIF डिटेक्शन।", "panel.convert.jpgDesc":"फोटो के लिए बेस्ट", "panel.convert.pngDesc":"ट्रांसपेरेंसी • लॉसलेस", "panel.convert.webpDesc":"मॉडर्न • -30% छोटा", "panel.convert.quality":"क्वालिटी", "panel.convert.bg":"JPG के लिए बैकग्राउंड", "panel.convert.bgDesc":"JPG के लिए सफेद, PNG/WebP/AVIF के लिए ट्रांसपेरेंट", "panel.convert.warn":"⚠️ JPG में ट्रांसपेरेंसी नहीं। ट्रांसपेरेंट एरिया BG रंग बन जाएगा।", "panel.convert.apply":"कन्वर्ट और डाउनलोड • Canvas",
+    "panel.crop.title":"क्रॉप", "panel.crop.desc":"बॉक्स ड्रैग करें, हैंडल से रीसाइज।", "panel.crop.cancel":"रद्द करें", "panel.crop.apply":"लागू करें",
+    "panel.rotate.title":"रोटेट और फ्लिप", "panel.rotate.left":"बायां 90°", "panel.rotate.right":"दायां 90°", "panel.rotate.straighten":"सीधा करें", "panel.rotate.apply":"सीधा लागू करें",
+    "panel.adjust.title":"एडजस्ट", "panel.adjust.desc":"Canvas फिल्टर से लाइव प्रीव्यू।", "panel.adjust.bright":"ब्राइटनेस", "panel.adjust.contrast":"कॉन्ट्रास्ट", "panel.adjust.sat":"सैचुरेशन", "panel.adjust.blur":"ब्लर", "panel.adjust.hue":"ह्यू", "panel.adjust.gray":"ग्रे", "panel.adjust.clear":"साफ़ करें", "panel.adjust.apply":"लागू करें",
+    "panel.wm.title":"वॉटरमार्क", "panel.wm.text":"टेक्स्ट", "panel.wm.size":"साइज़", "panel.wm.opacity":"ओपेसिटी", "panel.wm.color":"रंग", "panel.wm.pos":"पोजीशन", "panel.wm.apply":"वॉटरमार्क लागू करें",
+    "tip.title":"प्रो टिप:", "tip.desc":"Squoosh बेस्ट प्रैक्टिस — आर्टिफैक्ट देखने के लिए स्प्लिट तुलना उपयोग करें। C दबाएं, ⌘Z अनडू।",
+    "footer.design":"डिज़ाइन सिस्टम", "footer.designDesc":"8pt ग्रिड, Inter + Geist Mono, zinc + violet, 12px रेडियस, Canvas+WASM, बहुभाषी।", "footer.privacy":"प्राइवेसी", "footer.privacyDesc":"Canvas + pica WASM लोकल। कोई अपलोड नहीं, कोई कुकी नहीं।", "footer.stack":"स्टैक", "footer.stackDesc":"Tailwind CDN, Lucide, pica WASM, vanilla JS, 7 भाषाएं।", "footer.copy":"© 2026 imgtool.studio — v3.0 Canvas+WASM + i18n", "footer.tag":"लोकल • प्राइवेट • बहुभाषी"
+  },
+  es: {
+    "header.local_private":"Local • Privado", "header.no_upload":"Sin subida • Offline • Canvas+WASM", "header.paste":"pegar", "header.compare":"comparar", "header.pasteBtn":"Pegar",
+    "hero.badge":"Canvas + WASM • Sin subida • Multi-idioma", "hero.title1":"Herramientas de imagen que", "hero.title2":"se quedan en tu dispositivo.", "hero.desc":"Comprime, redimensiona, convierte — 100% en navegador vía Canvas + pica WASM. Sin servidor, sin rastreo. 7 idiomas.",
+    "drop.title":"Suelta imágenes aquí", "drop.subtitle":"o haz clic para navegar • arrastra desde Figma • pega en cualquier lugar", "drop.choose":"Elegir archivos", "drop.max":"Máx 50MB • Funciona offline • pica WASM para redimensionar", "drop.try":"Prueba",
+    "sample.landscape":"Paisaje", "sample.portrait":"Retrato", "sample.product":"Producto",
+    "feat.compress.title":"Comprimir • Canvas + WASM", "feat.compress.desc":"Control calidad, WebP/AVIF codecs nativos, PNG sin pérdida, tamaño objetivo, ahorro tiempo real.", "feat.compress.orig":"Original", "feat.compress.save":"-78% más pequeño",
+    "feat.resize.title":"Redimensionar • pica WASM", "feat.resize.desc":"Lanczos alta calidad vía pica WASM, bloqueo aspecto, escala %, presets, modos ajuste.",
+    "feat.convert.title":"Convertir • Multi-formato", "feat.convert.desc":"JPG ↔ PNG ↔ WebP ↔ AVIF, transparencia, fondo para JPG, ZIP por lotes, UI multi-idioma.",
+    "toolbar.compare":"Comparar", "toolbar.reset":"Reset", "toolbar.download":"Descargar",
+    "compare.original":"Original", "compare.edited":"Editado", "compare.live":"Vista previa",
+    "batch.title":"Lote", "batch.clear":"Limpiar",
+    "panel.compress.title":"Compresión • Canvas + WASM", "panel.compress.desc":"Tamaño tiempo real, MozJPEG/WebP/AVIF vía nativo.", "panel.compress.quality":"Calidad", "panel.compress.smaller":"más pequeño", "panel.compress.higher":"mayor calidad", "panel.compress.output":"Salida • cliente", "panel.compress.original":"Original", "panel.compress.keep":"Mantener tipo", "panel.compress.lossless":"Sin pérdida", "panel.compress.target":"Objetivo", "panel.compress.kb":"KB", "panel.compress.targetSize":"Tamaño objetivo (KB)", "panel.compress.targetDesc":"Auto-ajusta calidad para cumplir objetivo.", "panel.compress.origLabel":"Original", "panel.compress.compLabel":"Comprimido",
+    "panel.resize.title":"Redimensionar • pica WASM alta calidad", "panel.resize.desc":"Remuestreo Lanczos3 vía pica WASM, no bilineal.", "panel.resize.width":"Ancho", "panel.resize.height":"Alto", "panel.resize.lock":"Bloquear aspecto", "panel.resize.scale":"Escala", "panel.resize.presets":"Presets", "panel.resize.fit":"Modo ajuste", "panel.resize.noEnlarge":"No ampliar", "panel.resize.bg":"Fondo", "panel.resize.wasm":"pica usa Lanczos + WASM para redimensionado alta calidad.", "panel.resize.apply":"Aplicar redimensionado • WASM",
+    "panel.convert.title":"Convertir • Codecs cliente", "panel.convert.desc":"Canvas.toBlob() nativo + detección AVIF.", "panel.convert.jpgDesc":"Mejor para fotos", "panel.convert.pngDesc":"Transparencia • Sin pérdida", "panel.convert.webpDesc":"Moderno • -30% más pequeño", "panel.convert.quality":"Calidad", "panel.convert.bg":"Fondo para JPG", "panel.convert.bgDesc":"Blanco para JPG, transparente para PNG/WebP/AVIF", "panel.convert.warn":"⚠️ JPG sin transparencia. Áreas transparentes se vuelven color fondo.", "panel.convert.apply":"Convertir y descargar • Canvas",
+    "panel.crop.title":"Recortar", "panel.crop.desc":"Arrastra caja, tiradores para redimensionar.", "panel.crop.cancel":"Cancelar", "panel.crop.apply":"Aplicar",
+    "panel.rotate.title":"Rotar y Voltear", "panel.rotate.left":"Izq 90°", "panel.rotate.right":"Der 90°", "panel.rotate.straighten":"Enderezar", "panel.rotate.apply":"Aplicar enderezado",
+    "panel.adjust.title":"Ajustar", "panel.adjust.desc":"Vista previa vía filtro Canvas.", "panel.adjust.bright":"Brillo", "panel.adjust.contrast":"Contraste", "panel.adjust.sat":"Saturación", "panel.adjust.blur":"Desenfoque", "panel.adjust.hue":"Tono", "panel.adjust.gray":"Gris", "panel.adjust.clear":"Limpiar", "panel.adjust.apply":"Aplicar",
+    "panel.wm.title":"Marca agua", "panel.wm.text":"Texto", "panel.wm.size":"Tamaño", "panel.wm.opacity":"Opacidad", "panel.wm.color":"Color", "panel.wm.pos":"Posición", "panel.wm.apply":"Aplicar marca",
+    "tip.title":"Pro tip:", "tip.desc":"Squoosh — usa comparación dividida para ver artefactos. Presiona C, ⌘Z deshacer.",
+    "footer.design":"Sistema diseño", "footer.designDesc":"Grid 8pt, Inter + Geist Mono, zinc + violeta, 12px radio, Canvas+WASM, multi-idioma.", "footer.privacy":"Privacidad", "footer.privacyDesc":"Canvas + pica WASM solo local. Sin subida, sin cookies.", "footer.stack":"Stack", "footer.stackDesc":"Tailwind CDN, Lucide, pica WASM, vanilla JS, 7 idiomas.", "footer.copy":"© 2026 imgtool.studio — v3.0 Canvas+WASM + i18n", "footer.tag":"local • privado • multi-idioma"
+  },
+  fr: {
+    "header.local_private":"Local • Privé", "header.no_upload":"Pas d'upload • Hors ligne • Canvas+WASM", "header.paste":"coller", "header.compare":"comparer", "header.pasteBtn":"Coller",
+    "hero.badge":"Canvas + WASM • Pas d'upload • Multi-langue", "hero.title1":"Outils d'image qui", "hero.title2":"restent sur votre appareil.", "hero.desc":"Compressez, redimensionnez, convertissez — 100% navigateur via Canvas + pica WASM. Pas de serveur. 7 langues.",
+    "drop.title":"Déposez images ici", "drop.subtitle":"ou cliquez pour parcourir • glissez depuis Figma • collez partout", "drop.choose":"Choisir fichiers", "drop.max":"Max 50MB • Hors ligne • pica WASM pour redimensionner", "drop.try":"Essayez",
+    "sample.landscape":"Paysage", "sample.portrait":"Portrait", "sample.product":"Produit",
+    "feat.compress.title":"Compresser • Canvas + WASM", "feat.compress.desc":"Qualité, WebP/AVIF codecs natifs, PNG sans perte, taille cible, économies temps réel.", "feat.compress.orig":"Original", "feat.compress.save":"-78% plus petit",
+    "feat.resize.title":"Redimensionner • pica WASM", "feat.resize.desc":"Lanczos haute qualité via pica WASM, verrou aspect, échelle %, presets, modes fit.",
+    "feat.convert.title":"Convertir • Multi-format", "feat.convert.desc":"JPG ↔ PNG ↔ WebP ↔ AVIF, transparence, fond pour JPG, ZIP lot, UI multi-langue.",
+    "toolbar.compare":"Comparer", "toolbar.reset":"Reset", "toolbar.download":"Télécharger",
+    "compare.original":"Original", "compare.edited":"Édité", "compare.live":"Aperçu live",
+    "batch.title":"Lot", "batch.clear":"Effacer",
+    "panel.compress.title":"Compression • Canvas + WASM", "panel.compress.desc":"Taille temps réel, MozJPEG/WebP/AVIF via natif.", "panel.compress.quality":"Qualité", "panel.compress.smaller":"plus petit", "panel.compress.higher":"haute qualité", "panel.compress.output":"Sortie • côté client", "panel.compress.original":"Original", "panel.compress.keep":"Garder type", "panel.compress.lossless":"Sans perte", "panel.compress.target":"Cible", "panel.compress.kb":"Ko", "panel.compress.targetSize":"Taille cible (Ko)", "panel.compress.targetDesc":"Auto-ajuste qualité pour atteindre cible.", "panel.compress.origLabel":"Original", "panel.compress.compLabel":"Compressé",
+    "panel.resize.title":"Redimensionner • pica WASM haute qualité", "panel.resize.desc":"Rééchantillonnage Lanczos3 via pica WASM.", "panel.resize.width":"Largeur", "panel.resize.height":"Hauteur", "panel.resize.lock":"Verrou aspect", "panel.resize.scale":"Échelle", "panel.resize.presets":"Presets", "panel.resize.fit":"Mode fit", "panel.resize.noEnlarge":"Ne pas agrandir", "panel.resize.bg":"Fond", "panel.resize.wasm":"pica utilise Lanczos + WASM pour redimensionnement haute qualité.", "panel.resize.apply":"Appliquer redimensionnement • WASM",
+    "panel.convert.title":"Convertir • Codecs côté client", "panel.convert.desc":"Canvas.toBlob() natif + détection AVIF.", "panel.convert.jpgDesc":"Meilleur pour photos", "panel.convert.pngDesc":"Transparence • Sans perte", "panel.convert.webpDesc":"Moderne • -30% plus petit", "panel.convert.quality":"Qualité", "panel.convert.bg":"Fond pour JPG", "panel.convert.bgDesc":"Blanc pour JPG, transparent pour PNG/WebP/AVIF", "panel.convert.warn":"⚠️ JPG sans transparence. Zones transparentes deviennent couleur fond.", "panel.convert.apply":"Convertir et télécharger • Canvas",
+    "panel.crop.title":"Recadrer", "panel.crop.desc":"Glissez boîte, poignées pour redimensionner.", "panel.crop.cancel":"Annuler", "panel.crop.apply":"Appliquer",
+    "panel.rotate.title":"Rotation & Retournement", "panel.rotate.left":"Gauche 90°", "panel.rotate.right":"Droite 90°", "panel.rotate.straighten":"Redresser", "panel.rotate.apply":"Appliquer redressement",
+    "panel.adjust.title":"Ajuster", "panel.adjust.desc":"Aperçu via filtre Canvas.", "panel.adjust.bright":"Luminosité", "panel.adjust.contrast":"Contraste", "panel.adjust.sat":"Saturation", "panel.adjust.blur":"Flou", "panel.adjust.hue":"Teinte", "panel.adjust.gray":"Gris", "panel.adjust.clear":"Effacer", "panel.adjust.apply":"Appliquer",
+    "panel.wm.title":"Filigrane", "panel.wm.text":"Texte", "panel.wm.size":"Taille", "panel.wm.opacity":"Opacité", "panel.wm.color":"Couleur", "panel.wm.pos":"Position", "panel.wm.apply":"Appliquer filigrane",
+    "tip.title":"Astuce:", "tip.desc":"Squoosh — utilisez comparaison divisée pour voir artefacts. Pressez C, ⌘Z annuler.",
+    "footer.design":"Système design", "footer.designDesc":"Grille 8pt, Inter + Geist Mono, zinc + violet, 12px rayon, Canvas+WASM, multi-langue.", "footer.privacy":"Confidentialité", "footer.privacyDesc":"Canvas + pica WASM local seulement. Pas d'upload, pas de cookies.", "footer.stack":"Stack", "footer.stackDesc":"Tailwind CDN, Lucide, pica WASM, vanilla JS, 7 langues.", "footer.copy":"© 2026 imgtool.studio — v3.0 Canvas+WASM + i18n", "footer.tag":"local • privé • multi-langue"
+  },
+  de: {
+    "header.local_private":"Lokal • Privat", "header.no_upload":"Kein Upload • Offline • Canvas+WASM", "header.paste":"einfügen", "header.compare":"vergleichen", "header.pasteBtn":"Einfügen",
+    "hero.badge":"Canvas + WASM • Kein Upload • Mehrsprachig", "hero.title1":"Bild-Tools, die", "hero.title2":"auf deinem Gerät bleiben.", "hero.desc":"Komprimieren, Größe ändern, konvertieren — 100% im Browser via Canvas + pica WASM. Kein Server. 7 Sprachen.",
+    "drop.title":"Bilder hier ablegen", "drop.subtitle":"oder klicken zum Durchsuchen • aus Figma ziehen • überall einfügen", "drop.choose":"Dateien wählen", "drop.max":"Max 50MB • Offline • pica WASM für Resize", "drop.try":"Probieren",
+    "sample.landscape":"Landschaft", "sample.portrait":"Portrait", "sample.product":"Produkt",
+    "feat.compress.title":"Komprimieren • Canvas + WASM", "feat.compress.desc":"Qualitätsregler, WebP/AVIF native Codecs, PNG verlustfrei, Zielgröße, Echtzeit-Ersparnis.", "feat.compress.orig":"Original", "feat.compress.save":"-78% kleiner",
+    "feat.resize.title":"Größe ändern • pica WASM", "feat.resize.desc":"Hochwertiges Lanczos via pica WASM, Seitenverhältnis sperren, Skala %, Presets, Fit-Modi.",
+    "feat.convert.title":"Konvertieren • Multi-Format", "feat.convert.desc":"JPG ↔ PNG ↔ WebP ↔ AVIF, Transparenz, Hintergrund für JPG, Batch ZIP, mehrsprachig.",
+    "toolbar.compare":"Vergleichen", "toolbar.reset":"Reset", "toolbar.download":"Download",
+    "compare.original":"Original", "compare.edited":"Bearbeitet", "compare.live":"Live-Vorschau",
+    "batch.title":"Batch", "batch.clear":"Löschen",
+    "panel.compress.title":"Kompression • Canvas + WASM", "panel.compress.desc":"Echtzeit-Größe, MozJPEG/WebP/AVIF via nativ.", "panel.compress.quality":"Qualität", "panel.compress.smaller":"kleiner", "panel.compress.higher":"höhere Qualität", "panel.compress.output":"Ausgabe • client-seitig", "panel.compress.original":"Original", "panel.compress.keep":"Typ behalten", "panel.compress.lossless":"Verlustfrei", "panel.compress.target":"Ziel", "panel.compress.kb":"KB", "panel.compress.targetSize":"Ziel-Dateigröße (KB)", "panel.compress.targetDesc":"Qualität auto-anpassen für Ziel.", "panel.compress.origLabel":"Original", "panel.compress.compLabel":"Komprimiert",
+    "panel.resize.title":"Größe ändern • pica WASM hohe Qualität", "panel.resize.desc":"Lanczos3 Resampling via pica WASM, nicht bilinear.", "panel.resize.width":"Breite", "panel.resize.height":"Höhe", "panel.resize.lock":"Seitenverhältnis sperren", "panel.resize.scale":"Skala", "panel.resize.presets":"Presets", "panel.resize.fit":"Fit-Modus", "panel.resize.noEnlarge":"Nicht vergrößern", "panel.resize.bg":"HG", "panel.resize.wasm":"pica nutzt Lanczos + WASM für hochwertiges Resizing.", "panel.resize.apply":"Resize anwenden • WASM",
+    "panel.convert.title":"Konvertieren • Client-seitige Codecs", "panel.convert.desc":"Canvas.toBlob() nativ + AVIF Erkennung.", "panel.convert.jpgDesc":"Beste für Fotos", "panel.convert.pngDesc":"Transparenz • Verlustfrei", "panel.convert.webpDesc":"Modern • -30% kleiner", "panel.convert.quality":"Qualität", "panel.convert.bg":"Hintergrund für JPG", "panel.convert.bgDesc":"Weiß für JPG, transparent für PNG/WebP/AVIF", "panel.convert.warn":"⚠️ JPG keine Transparenz. Transparente Bereiche werden Hintergrundfarbe.", "panel.convert.apply":"Konvertieren & Download • Canvas",
+    "panel.crop.title":"Zuschneiden", "panel.crop.desc":"Box ziehen, Griffe zum Ändern.", "panel.crop.cancel":"Abbrechen", "panel.crop.apply":"Anwenden",
+    "panel.rotate.title":"Drehen & Spiegeln", "panel.rotate.left":"Links 90°", "panel.rotate.right":"Rechts 90°", "panel.rotate.straighten":"Gerade richten", "panel.rotate.apply":"Gerade anwenden",
+    "panel.adjust.title":"Anpassen", "panel.adjust.desc":"Live-Vorschau via Canvas Filter.", "panel.adjust.bright":"Helligkeit", "panel.adjust.contrast":"Kontrast", "panel.adjust.sat":"Sättigung", "panel.adjust.blur":"Weichzeichner", "panel.adjust.hue":"Farbton", "panel.adjust.gray":"Grau", "panel.adjust.clear":"Löschen", "panel.adjust.apply":"Anwenden",
+    "panel.wm.title":"Wasserzeichen", "panel.wm.text":"Text", "panel.wm.size":"Größe", "panel.wm.opacity":"Deckkraft", "panel.wm.color":"Farbe", "panel.wm.pos":"Position", "panel.wm.apply":"Wasserzeichen anwenden",
+    "tip.title":"Pro Tipp:", "tip.desc":"Squoosh — Split-Vergleich nutzen um Artefakte zu sehen. C drücken, ⌘Z rückgängig.",
+    "footer.design":"Design System", "footer.designDesc":"8pt Grid, Inter + Geist Mono, zinc + violett, 12px Radius, Canvas+WASM, mehrsprachig.", "footer.privacy":"Privatsphäre", "footer.privacyDesc":"Canvas + pica WASM nur lokal. Kein Upload, keine Cookies.", "footer.stack":"Stack", "footer.stackDesc":"Tailwind CDN, Lucide, pica WASM, vanilla JS, 7 Sprachen.", "footer.copy":"© 2026 imgtool.studio — v3.0 Canvas+WASM + i18n", "footer.tag":"lokal • privat • mehrsprachig"
+  },
+  ja: {
+    "header.local_private":"ローカル • プライベート", "header.no_upload":"アップロードなし • オフライン • Canvas+WASM", "header.paste":"貼り付け", "header.compare":"比較", "header.pasteBtn":"貼り付け",
+    "hero.badge":"Canvas + WASM • アップロードなし • 多言語", "hero.title1":"デバイスに残る", "hero.title2":"画像ツール。", "hero.desc":"圧縮、リサイズ、変換 — Canvas API + pica WASMで100%ブラウザ内。サーバーなし。7言語対応。",
+    "drop.title":"画像をここにドロップ", "drop.subtitle":"またはクリックして選択 • Figmaからドラッグ • どこでも貼り付け", "drop.choose":"ファイルを選択", "drop.max":"最大50MB • オフライン • リサイズにpica WASM", "drop.try":"試す",
+    "sample.landscape":"風景", "sample.portrait":"ポートレート", "sample.product":"プロダクト",
+    "feat.compress.title":"圧縮 • Canvas + WASM", "feat.compress.desc":"品質スライダー、WebP/AVIFネイティブコーデック、PNGロスレス、ターゲットサイズ、リアルタイム節約。", "feat.compress.orig":"オリジナル", "feat.compress.save":"-78% 小さく",
+    "feat.resize.title":"リサイズ • pica WASM", "feat.resize.desc":"pica WASMによる高品質Lanczos、アスペクトロック、スケール%、プリセット、フィットモード。",
+    "feat.convert.title":"変換 • マルチフォーマット", "feat.convert.desc":"JPG ↔ PNG ↔ WebP ↔ AVIF、透明保持、JPG用BG、バッチZIP、多言語UI。",
+    "toolbar.compare":"比較", "toolbar.reset":"リセット", "toolbar.download":"ダウンロード",
+    "compare.original":"オリジナル", "compare.edited":"編集後", "compare.live":"ライブプレビュー",
+    "batch.title":"バッチ", "batch.clear":"クリア",
+    "panel.compress.title":"圧縮 • Canvas + WASM", "panel.compress.desc":"リアルタイムサイズ、MozJPEG/WebP/AVIFネイティブ。", "panel.compress.quality":"品質", "panel.compress.smaller":"小さく", "panel.compress.higher":"高品質", "panel.compress.output":"出力 • クライアントサイド", "panel.compress.original":"オリジナル", "panel.compress.keep":"タイプ保持", "panel.compress.lossless":"ロスレス", "panel.compress.target":"ターゲット", "panel.compress.kb":"KB", "panel.compress.targetSize":"ターゲットファイルサイズ (KB)", "panel.compress.targetDesc":"ターゲットに合わせて品質自動調整。", "panel.compress.origLabel":"オリジナル", "panel.compress.compLabel":"圧縮後",
+    "panel.resize.title":"リサイズ • pica WASM高品質", "panel.resize.desc":"pica WASMによるLanczos3リサンプリング。", "panel.resize.width":"幅", "panel.resize.height":"高さ", "panel.resize.lock":"アスペクトロック", "panel.resize.scale":"スケール", "panel.resize.presets":"プリセット", "panel.resize.fit":"フィットモード", "panel.resize.noEnlarge":"拡大しない", "panel.resize.bg":"背景", "panel.resize.wasm":"picaは高品質リサイズにLanczos + WASMを使用。", "panel.resize.apply":"リサイズ適用 • WASM",
+    "panel.convert.title":"変換 • クライアントサイドコーデック", "panel.convert.desc":"Canvas.toBlob()ネイティブ + AVIF検出。", "panel.convert.jpgDesc":"写真に最適", "panel.convert.pngDesc":"透明 • ロスレス", "panel.convert.webpDesc":"モダン • -30%小さく", "panel.convert.quality":"品質", "panel.convert.bg":"JPG用背景", "panel.convert.bgDesc":"JPGは白、PNG/WebP/AVIFは透明保持", "panel.convert.warn":"⚠️ JPGは透明なし。透明部分はBG色になります。", "panel.convert.apply":"変換＆ダウンロード • Canvas",
+    "panel.crop.title":"クロップ", "panel.crop.desc":"ボックスをドラッグ、ハンドルでリサイズ。", "panel.crop.cancel":"キャンセル", "panel.crop.apply":"適用",
+    "panel.rotate.title":"回転＆反転", "panel.rotate.left":"左90°", "panel.rotate.right":"右90°", "panel.rotate.straighten":"傾き補正", "panel.rotate.apply":"補正適用",
+    "panel.adjust.title":"調整", "panel.adjust.desc":"Canvasフィルターでライブプレビュー。", "panel.adjust.bright":"明るさ", "panel.adjust.contrast":"コントラスト", "panel.adjust.sat":"彩度", "panel.adjust.blur":"ブラー", "panel.adjust.hue":"色相", "panel.adjust.gray":"グレー", "panel.adjust.clear":"クリア", "panel.adjust.apply":"適用",
+    "panel.wm.title":"ウォーターマーク", "panel.wm.text":"テキスト", "panel.wm.size":"サイズ", "panel.wm.opacity":"不透明度", "panel.wm.color":"色", "panel.wm.pos":"位置", "panel.wm.apply":"ウォーターマーク適用",
+    "tip.title":"プロTip:", "tip.desc":"Squoosh流 — スプリット比較でアーティファクト確認。Cで切替、⌘Zで元に戻す。",
+    "footer.design":"デザインシステム", "footer.designDesc":"8ptグリッド、Inter + Geist Mono、zinc + violet、12px半径、Canvas+WASM、多言語。", "footer.privacy":"プライバシー", "footer.privacyDesc":"Canvas + pica WASMローカルのみ。アップロードなし、Cookieなし。", "footer.stack":"スタック", "footer.stackDesc":"Tailwind CDN、Lucide、pica WASM、vanilla JS、7言語。", "footer.copy":"© 2026 imgtool.studio — v3.0 Canvas+WASM + i18n", "footer.tag":"ローカル • プライベート • 多言語"
+  },
+  zh: {
+    "header.local_private":"本地 • 私密", "header.no_upload":"无上传 • 离线 • Canvas+WASM", "header.paste":"粘贴", "header.compare":"对比", "header.pasteBtn":"粘贴",
+    "hero.badge":"Canvas + WASM • 无上传 • 多语言", "hero.title1":"留在你设备上的", "hero.title2":"图像工具。", "hero.desc":"压缩、调整大小、转换 — 100% 在浏览器通过 Canvas + pica WASM。无服务器。7 种语言。",
+    "drop.title":"在此拖放图像", "drop.subtitle":"或点击浏览 • 从 Figma 拖动 • 随处粘贴", "drop.choose":"选择文件", "drop.max":"最大 50MB • 离线工作 • 调整大小用 pica WASM", "drop.try":"试试",
+    "sample.landscape":"风景", "sample.portrait":"人像", "sample.product":"产品",
+    "feat.compress.title":"压缩 • Canvas + WASM", "feat.compress.desc":"质量滑块、WebP/AVIF 原生编解码、PNG 无损、目标大小、实时节省。", "feat.compress.orig":"原始", "feat.compress.save":"-78% 更小",
+    "feat.resize.title":"调整大小 • pica WASM", "feat.resize.desc":"通过 pica WASM 高质量 Lanczos、锁定纵横比、缩放%、预设、适应模式。",
+    "feat.convert.title":"转换 • 多格式", "feat.convert.desc":"JPG ↔ PNG ↔ WebP ↔ AVIF、保持透明、JPG 背景、批量 ZIP、多语言 UI。",
+    "toolbar.compare":"对比", "toolbar.reset":"重置", "toolbar.download":"下载",
+    "compare.original":"原始", "compare.edited":"已编辑", "compare.live":"实时预览",
+    "batch.title":"批量", "batch.clear":"清除",
+    "panel.compress.title":"压缩 • Canvas + WASM", "panel.compress.desc":"实时大小、MozJPEG/WebP/AVIF 原生。", "panel.compress.quality":"质量", "panel.compress.smaller":"更小", "panel.compress.higher":"更高质量", "panel.compress.output":"输出 • 客户端", "panel.compress.original":"原始", "panel.compress.keep":"保持类型", "panel.compress.lossless":"无损", "panel.compress.target":"目标", "panel.compress.kb":"KB", "panel.compress.targetSize":"目标文件大小 (KB)", "panel.compress.targetDesc":"自动调整质量以满足目标。", "panel.compress.origLabel":"原始", "panel.compress.compLabel":"已压缩",
+    "panel.resize.title":"调整大小 • pica WASM 高质量", "panel.resize.desc":"通过 pica WASM Lanczos3 重采样，非双线性。", "panel.resize.width":"宽度", "panel.resize.height":"高度", "panel.resize.lock":"锁定纵横比", "panel.resize.scale":"缩放", "panel.resize.presets":"预设", "panel.resize.fit":"适应模式", "panel.resize.noEnlarge":"不放大", "panel.resize.bg":"背景", "panel.resize.wasm":"pica 使用 Lanczos + WASM 高质量调整大小，优于 canvas 双线性。", "panel.resize.apply":"应用调整 • WASM",
+    "panel.convert.title":"转换 • 客户端编解码", "panel.convert.desc":"Canvas.toBlob() 原生 + AVIF 检测。", "panel.convert.jpgDesc":"最适合照片", "panel.convert.pngDesc":"透明 • 无损", "panel.convert.webpDesc":"现代 • -30% 更小", "panel.convert.quality":"质量", "panel.convert.bg":"JPG 背景", "panel.convert.bgDesc":"JPG 白色，PNG/WebP/AVIF 保持透明", "panel.convert.warn":"⚠️ JPG 无透明。透明区域变为背景色。", "panel.convert.apply":"转换并下载 • Canvas",
+    "panel.crop.title":"裁剪", "panel.crop.desc":"拖动框，手柄调整大小。", "panel.crop.cancel":"取消", "panel.crop.apply":"应用",
+    "panel.rotate.title":"旋转与翻转", "panel.rotate.left":"左 90°", "panel.rotate.right":"右 90°", "panel.rotate.straighten":"拉直", "panel.rotate.apply":"应用拉直",
+    "panel.adjust.title":"调整", "panel.adjust.desc":"通过 Canvas 滤镜实时预览。", "panel.adjust.bright":"亮度", "panel.adjust.contrast":"对比度", "panel.adjust.sat":"饱和度", "panel.adjust.blur":"模糊", "panel.adjust.hue":"色相", "panel.adjust.gray":"灰度", "panel.adjust.clear":"清除", "panel.adjust.apply":"应用",
+    "panel.wm.title":"水印", "panel.wm.text":"文本", "panel.wm.size":"大小", "panel.wm.opacity":"不透明度", "panel.wm.color":"颜色", "panel.wm.pos":"位置", "panel.wm.apply":"应用水印",
+    "tip.title":"专业提示：", "tip.desc":"Squoosh 最佳实践 — 使用分屏对比查看瑕疵。按 C 切换，⌘Z 撤销。",
+    "footer.design":"设计系统", "footer.designDesc":"8pt 网格、Inter + Geist Mono、zinc + violet、12px 圆角、Canvas+WASM、多语言。", "footer.privacy":"隐私", "footer.privacyDesc":"Canvas + pica WASM 仅本地。无上传，无 Cookie。", "footer.stack":"技术栈", "footer.stackDesc":"Tailwind CDN、Lucide、pica WASM、vanilla JS、7 语言。", "footer.copy":"© 2026 imgtool.studio — v3.0 Canvas+WASM + i18n", "footer.tag":"本地 • 私密 • 多语言"
+  }
+};
+
+let currentLang = localStorage.getItem('imgtool-lang') || (navigator.language.startsWith('hi')?'hi': navigator.language.slice(0,2) in translations ? navigator.language.slice(0,2) : 'en');
+function t(key){ return translations[currentLang]?.[key] || translations.en[key] || key; }
+function applyI18n(){
+  document.documentElement.lang = currentLang;
+  $$('[data-i18n]').forEach(el=>{ const key=el.getAttribute('data-i18n'); if(translations[currentLang]?.[key]||translations.en[key]) el.textContent=t(key); });
+  $('#langLabel').textContent=currentLang.toUpperCase();
+  // update tooltips for tools
+  $$('.tool-btn').forEach(btn=>{
+    const tool=btn.dataset.tool;
+    const map={compress:'Compress (1)', resize:'Resize (2)', convert:'Convert (3)', crop:'Crop (4)', rotate:'Rotate (5)', adjust:'Adjust (6)', watermark:'Watermark (7)'};
+    btn.setAttribute('data-tip', map[tool]||tool);
+  });
+  lucide.createIcons();
+}
+function setLang(lang){
+  if(!translations[lang]) return;
+  currentLang=lang; localStorage.setItem('imgtool-lang', lang); applyI18n(); $('#langMenu').classList.add('hidden');
+}
+$('#langBtn').addEventListener('click',()=> $('#langMenu').classList.toggle('hidden'));
+$$('.lang-opt').forEach(b=> b.addEventListener('click',()=> setLang(b.dataset.lang)));
+document.addEventListener('click', e=>{ if(!e.target.closest('#langBtn') && !e.target.closest('#langMenu')) $('#langMenu').classList.add('hidden'); });
+applyI18n();
+
+// ==================== State ====================
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 const mainCanvas=$('#mainCanvas'), ctx=mainCanvas.getContext('2d',{willReadFrequently:true});
 const compareCanvas=$('#compareCanvas'), cCtx=compareCanvas.getContext('2d');
 const dropzone=$('#dropzone'), fileInput=$('#fileInput'), emptyState=$('#emptyState'), appState=$('#appState'), mainFooter=$('#mainFooter');
-let state={ originalImg:null, originalFile:null, originalDataUrl:null, originalWidth:0, originalHeight:0, history:[], historyIndex:-1, tool:'compress', format:'original', cFormat:'image/jpeg', quality:80, cQuality:85, zoom:100, filters:{brightness:100,contrast:100,saturate:100,blur:0,hue:0,grayscale:false,sepia:false,invert:false}, watermark:{text:'',size:36,opacity:60,color:'#ffffff',pos:'br'}, crop:{x:0.1,y:0.1,w:0.8,h:0.8,ratio:'free'}, rotate:{angle:0,flipH:false,flipV:false,straighten:0}, batch:[], compare:false };
+let state={ originalImg:null, originalFile:null, originalDataUrl:null, originalWidth:0, originalHeight:0, history:[], historyIndex:-1, tool:'compress', format:'original', cFormat:'image/jpeg', quality:80, cQuality:85, zoom:100, filters:{brightness:100,contrast:100,saturate:100,blur:0,hue:0,grayscale:false,sepia:false,invert:false}, watermark:{text:'',size:36,opacity:60,color:'#ffffff',pos:'br'}, crop:{x:0.1,y:0.1,w:0.8,h:0.8,ratio:'free'}, rotate:{angle:0,flipH:false,flipV:false,straighten:0}, batch:[], compare:false, fit:'cover', bgColor:'#ffffff', convertBg:'#ffffff', picaReady:false, avifSupported:false };
+
+let picaInstance=null;
+try{ picaInstance=pica({features:['js','wasm','ww']}); state.picaReady=true; $('#picaStatus').textContent='ready ✓'; $('#codecInfo').textContent='pica WASM ready'; }catch(e){ $('#picaStatus').textContent='fallback canvas'; console.warn('pica init failed',e); }
+
+// AVIF support detection
+async function checkAvif(){
+  try{
+    const c=document.createElement('canvas'); c.width=1; c.height=1;
+    const blob=await new Promise(r=> c.toBlob(r,'image/avif'));
+    state.avifSupported=!!blob;
+    $('#avifSupport').textContent= state.avifSupported ? 'supported ✓' : 'not supported';
+    $('#cAvifSupport').textContent= state.avifSupported ? 'AVIF • next-gen • ~50% smaller' : 'AVIF not supported in this browser';
+    if(!state.avifSupported){ $('#avifBtn').classList.add('opacity-40','pointer-events-none'); $('#cAvifBtn').classList.add('opacity-40','pointer-events-none'); }
+  }catch{ state.avifSupported=false; $('#avifSupport').textContent='not supported'; $('#cAvifSupport').textContent='AVIF not supported'; }
+}
+checkAvif();
 
 function pushHistory(){
-  try{
-    const data=mainCanvas.toDataURL('image/png');
-    state.history=state.history.slice(0,state.historyIndex+1);
-    state.history.push(data);
-    if(state.history.length>20) state.history.shift(); else state.historyIndex++;
-    if(state.history.length>20) state.historyIndex=19;
-    updateUndoRedo();
-  }catch(e){ console.warn(e) }
+  try{ const data=mainCanvas.toDataURL('image/png'); state.history=state.history.slice(0,state.historyIndex+1); state.history.push(data); if(state.history.length>20) state.history.shift(); else state.historyIndex++; if(state.history.length>20) state.historyIndex=19; updateUndoRedo(); }catch(e){ console.warn(e) }
 }
 function updateUndoRedo(){ $('#undoBtn').disabled=state.historyIndex<=0; $('#redoBtn').disabled=state.historyIndex>=state.history.length-1; }
-function restoreHistory(idx){
-  if(idx<0||idx>=state.history.length) return;
-  const img=new Image();
-  img.onload=()=>{ mainCanvas.width=img.width; mainCanvas.height=img.height; ctx.clearRect(0,0,img.width,img.height); ctx.drawImage(img,0,0); state.historyIndex=idx; updateUndoRedo(); refreshCanvasContainer(); estimateSize(); };
-  img.src=state.history[idx];
-}
+function restoreHistory(idx){ if(idx<0||idx>=state.history.length) return; const img=new Image(); img.onload=()=>{ mainCanvas.width=img.width; mainCanvas.height=img.height; ctx.clearRect(0,0,img.width,img.height); ctx.drawImage(img,0,0); state.historyIndex=idx; updateUndoRedo(); refreshCanvasContainer(); estimateSize(); }; img.src=state.history[idx]; }
 async function loadFile(file){
   if(!file.type.startsWith('image/')) return alert('Please drop an image');
-  state.originalFile=file;
-  state.originalDataUrl=await new Promise(r=>{ const fr=new FileReader(); fr.onload=e=>r(e.target.result); fr.readAsDataURL(file); });
-  const img=new Image();
-  img.onload=()=>{
+  state.originalFile=file; state.originalDataUrl=await new Promise(r=>{ const fr=new FileReader(); fr.onload=e=>r(e.target.result); fr.readAsDataURL(file); });
+  const img=new Image(); img.onload=()=>{
     state.originalImg=img; state.originalWidth=img.width; state.originalHeight=img.height;
     mainCanvas.width=img.width; mainCanvas.height=img.height; ctx.clearRect(0,0,img.width,img.height); ctx.drawImage(img,0,0);
-    state.filters={brightness:100,contrast:100,saturate:100,blur:0,hue:0,grayscale:false,sepia:false,invert:false};
-    state.rotate={angle:0,flipH:false,flipV:false,straighten:0}; state.crop={x:0.1,y:0.1,w:0.8,h:0.8,ratio:state.crop.ratio};
+    state.filters={brightness:100,contrast:100,saturate:100,blur:0,hue:0,grayscale:false,sepia:false,invert:false}; state.rotate={angle:0,flipH:false,flipV:false,straighten:0}; state.crop={x:0.1,y:0.1,w:0.8,h:0.8,ratio:state.crop.ratio};
     state.history=[]; state.historyIndex=-1; pushHistory(); showApp(); updateMeta(); refreshCanvasContainer(); estimateSize(); updateResizeInputs();
     if(!state.batch.find(b=>b.name===file.name && b.size===file.size)){ state.batch.push({file,img,name:file.name,size:file.size,dataUrl:state.originalDataUrl}); renderBatch(); }
-    compareCanvas.width=img.width; compareCanvas.height=img.height; cCtx.drawImage(img,0,0);
-    lucide.createIcons();
-  };
-  img.src=state.originalDataUrl;
+    compareCanvas.width=img.width; compareCanvas.height=img.height; cCtx.drawImage(img,0,0); lucide.createIcons();
+  }; img.src=state.originalDataUrl;
 }
 function showApp(){ emptyState.classList.add('hidden'); mainFooter.classList.add('hidden'); appState.classList.remove('hidden'); }
 function showEmpty(){ emptyState.classList.remove('hidden'); mainFooter.classList.remove('hidden'); appState.classList.add('hidden'); state.batch=[]; renderBatch(); }
-function updateMeta(){
-  if(!state.originalFile) return;
-  $('#fileNameLabel').textContent=state.originalFile.name;
-  $('#fileMetaLabel').textContent=`${state.originalWidth} × ${state.originalHeight} • ${(state.originalFile.size/1024).toFixed(1)} KB • ${state.originalFile.type||'image'}`;
-  $('#fileCountBadge').textContent=state.batch.length;
-  $('#origSizeLabel').textContent=formatBytes(state.originalFile.size);
-}
+function updateMeta(){ if(!state.originalFile) return; $('#fileNameLabel').textContent=state.originalFile.name; $('#fileMetaLabel').textContent=`${state.originalWidth} × ${state.originalHeight} • ${(state.originalFile.size/1024).toFixed(1)} KB • ${state.originalFile.type||'image'}`; $('#fileCountBadge').textContent=state.batch.length; $('#origSizeLabel').textContent=formatBytes(state.originalFile.size); }
 function formatBytes(b){ if(b<1024) return b+' B'; if(b<1024*1024) return (b/1024).toFixed(1)+' KB'; return (b/1024/1024).toFixed(2)+' MB'; }
-function refreshCanvasContainer(){
-  const cont=$('#canvasContainer'), wrap=$('#canvasWrap');
-  const maxW=wrap.clientWidth-64, maxH=wrap.clientHeight-64;
-  const ratio=Math.min(maxW/mainCanvas.width, maxH/mainCanvas.height, 1);
-  cont.style.width=(mainCanvas.width*ratio)+'px'; cont.style.height=(mainCanvas.height*ratio)+'px';
-  mainCanvas.style.width='100%'; mainCanvas.style.height='100%';
-}
+function refreshCanvasContainer(){ const cont=$('#canvasContainer'), wrap=$('#canvasWrap'); const maxW=wrap.clientWidth-64, maxH=wrap.clientHeight-64; const ratio=Math.min(maxW/mainCanvas.width, maxH/mainCanvas.height, 1); cont.style.width=(mainCanvas.width*ratio)+'px'; cont.style.height=(mainCanvas.height*ratio)+'px'; mainCanvas.style.width='100%'; mainCanvas.style.height='100%'; }
 window.addEventListener('resize', refreshCanvasContainer);
 
 /* Drop & Paste */
@@ -496,185 +511,124 @@ dropzone.addEventListener('dragover',e=>{ e.preventDefault(); dropzone.classList
 dropzone.addEventListener('dragleave',()=>dropzone.classList.remove('!border-zinc-900','dark:!border-white'));
 dropzone.addEventListener('drop',e=>{ e.preventDefault(); dropzone.classList.remove('!border-zinc-900','dark:!border-white'); const files=[...e.dataTransfer.files].filter(f=>f.type.startsWith('image/')); files.forEach(loadFile); });
 fileInput.addEventListener('change',e=>{ [...e.target.files].forEach(loadFile); });
-document.addEventListener('paste',e=>{
-  const items=[...(e.clipboardData?.items||[])]; const imgItem=items.find(i=>i.type.startsWith('image/')); if(imgItem){ const file=imgItem.getAsFile(); if(file) loadFile(file); }
-});
-$('#pasteBtn').addEventListener('click', async()=>{
-  try{ const items=await navigator.clipboard.read(); for(const it of items){ for(const t of it.types){ if(t.startsWith('image/')){ const blob=await it.getType(t); loadFile(new File([blob],'pasted.png',{type:t})); } } } }catch{ alert('Clipboard read failed. Try Ctrl+V.'); }
-});
-$$('[data-sample]').forEach(btn=> btn.addEventListener('click', async()=>{
-  const url=btn.dataset.sample;
-  try{ const res=await fetch(url); const blob=await res.blob(); loadFile(new File([blob],'sample.jpg',{type:blob.type})); }catch(e){ window.open(url,'_blank'); }
-}));
+document.addEventListener('paste',e=>{ const items=[...(e.clipboardData?.items||[])]; const imgItem=items.find(i=>i.type.startsWith('image/')); if(imgItem){ const file=imgItem.getAsFile(); if(file) loadFile(file); } });
+$('#pasteBtn').addEventListener('click', async()=>{ try{ const items=await navigator.clipboard.read(); for(const it of items){ for(const t of it.types){ if(t.startsWith('image/')){ const blob=await it.getType(t); loadFile(new File([blob],'pasted.png',{type:t})); } } } }catch{ alert('Clipboard read failed. Try Ctrl+V.'); } });
+$$('[data-sample]').forEach(btn=> btn.addEventListener('click', async()=>{ const url=btn.dataset.sample; try{ const res=await fetch(url); const blob=await res.blob(); loadFile(new File([blob],'sample.jpg',{type:blob.type})); }catch(e){ window.open(url,'_blank'); } }));
 
 /* Tools */
 $$('.tool-btn').forEach(b=> b.addEventListener('click',()=>{
-  $$('.tool-btn').forEach(x=> x.className='tool-btn w-10 h-10 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-900 dark:hover:text-white flex items-center justify-center focus-ring transition tooltip');
-  b.className='tool-btn active w-10 h-10 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 flex items-center justify-center shadow-sm focus-ring transition tooltip';
-  state.tool=b.dataset.tool;
-  $$('.tool-panel').forEach(p=> p.classList.add('hidden'));
-  $(`#panel-${state.tool}`).classList.remove('hidden');
-  if(state.tool==='crop') enableCrop(); else disableCrop();
-  lucide.createIcons();
+  $$('.tool-btn').forEach(x=> x.className='tool-btn w-10 h-10 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 flex items-center justify-center focus-ring tooltip');
+  b.className='tool-btn active w-10 h-10 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 flex items-center justify-center shadow-sm focus-ring tooltip';
+  state.tool=b.dataset.tool; $$('.tool-panel').forEach(p=> p.classList.add('hidden')); $(`#panel-${state.tool}`).classList.remove('hidden'); if(state.tool==='crop') enableCrop(); else disableCrop(); lucide.createIcons();
 }));
 $('#addMoreBtn').addEventListener('click',()=>fileInput.click());
 $('#backBtn').addEventListener('click',showEmpty);
 
-/* Compression - Squoosh best practice */
+/* Compression */
 $('#qualityRange').addEventListener('input',e=>{ state.quality=+e.target.value; $('#qualityVal').textContent=state.quality+'%'; estimateSize(); });
 $$('.format-btn').forEach(b=> b.addEventListener('click',()=>{
-  $$('.format-btn').forEach(x=> x.className='format-btn h-[72px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 flex flex-col items-start p-3 text-left hover:border-zinc-300 focus-ring');
-  b.className='format-btn active h-[72px] rounded-xl border-[1.5px] border-zinc-900 dark:border-white bg-zinc-50 dark:bg-zinc-900 flex flex-col items-start p-3 text-left focus-ring';
-  state.format=b.dataset.format; estimateSize();
+  if(b.dataset.format==='target'){ $('#targetSizeWrap').classList.toggle('hidden'); return; }
+  $$('.format-btn').forEach(x=>{ if(x.dataset.format!=='target') x.className='format-btn h-[72px] rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 flex flex-col items-start p-3 text-left hover:border-zinc-300 focus-ring'; });
+  if(b.dataset.format!=='target'){ b.className='format-btn active h-[72px] rounded-xl border-[1.5px] border-zinc-900 dark:border-white bg-zinc-50 dark:bg-zinc-900 flex flex-col items-start p-3 text-left focus-ring'; state.format=b.dataset.format; estimateSize(); }
 }));
 function estimateSize(){
-  if(!state.originalImg) return;
-  const fmt=state.format==='original'?(state.originalFile?.type||'image/jpeg'):state.format;
-  const q=state.quality/100;
-  mainCanvas.toBlob(blob=>{
-    if(!blob) return;
-    $('#compSizeLabel').textContent=formatBytes(blob.size);
-    const orig=state.originalFile?.size||blob.size;
-    const saved=orig>0?Math.max(0,((orig-blob.size)/orig*100)):0;
-    $('#savingsBar').style.width=saved+'%';
-    $('#savingsLabel').textContent=saved.toFixed(1)+'% saved • '+fmt.split('/')[1].toUpperCase();
-  }, fmt, fmt==='image/png'?undefined:q);
+  if(!state.originalImg) return; const fmt=state.format==='original'?(state.originalFile?.type||'image/jpeg'):state.format; const q=state.quality/100;
+  mainCanvas.toBlob(blob=>{ if(!blob) return; $('#compSizeLabel').textContent=formatBytes(blob.size); const orig=state.originalFile?.size||blob.size; const saved=orig>0?Math.max(0,((orig-blob.size)/orig*100)):0; $('#savingsBar').style.width=saved+'%'; $('#savingsLabel').textContent=saved.toFixed(1)+'% saved • '+fmt.split('/')[1].toUpperCase(); }, fmt, fmt==='image/png'?undefined:q);
 }
+$('#applyTargetBtn').addEventListener('click', async()=>{
+  const targetKB=parseInt($('#targetSize').value); if(!targetKB) return;
+  let low=1, high=100, best=80;
+  for(let i=0;i<7;i++){ const mid=Math.floor((low+high)/2); const blob=await new Promise(r=> mainCanvas.toBlob(r, 'image/jpeg', mid/100)); if(!blob) break; const kb=blob.size/1024; if(kb<=targetKB){ best=mid; low=mid+1; } else { high=mid-1; } }
+  state.quality=best; $('#qualityRange').value=best; $('#qualityVal').textContent=best+'%'; estimateSize();
+});
 
-/* Resize */
+/* Resize - WASM pica */
 function updateResizeInputs(){ if(!state.originalImg) return; $('#resizeW').value=mainCanvas.width; $('#resizeH').value=mainCanvas.height; $('#scaleVal').textContent='100%'; $('#scaleRange').value=100; }
 $('#resizeW').addEventListener('input',e=>{ if($('#lockAspect').checked && state.originalWidth){ const ratio=state.originalHeight/state.originalWidth; $('#resizeH').value=Math.round(+e.target.value*ratio); } });
 $('#resizeH').addEventListener('input',e=>{ if($('#lockAspect').checked && state.originalHeight){ const ratio=state.originalWidth/state.originalHeight; $('#resizeW').value=Math.round(+e.target.value*ratio); } });
 $('#scaleRange').addEventListener('input',e=>{ const pct=+e.target.value; $('#scaleVal').textContent=pct+'%'; if(!state.originalImg) return; const w=Math.round(state.originalWidth*pct/100), h=Math.round(state.originalHeight*pct/100); $('#resizeW').value=w; $('#resizeH').value=h; });
 $$('.preset-btn').forEach(b=> b.addEventListener('click',()=>{ const [w,h]=b.dataset.preset.split('x').map(Number); $('#resizeW').value=w; $('#resizeH').value=h; }));
-let fitMode='cover';
-$('#applyResizeBtn').addEventListener('click',()=>{
+$$('.fit-btn').forEach(b=> b.addEventListener('click',()=>{ $$('.fit-btn').forEach(x=> x.className='fit-btn h-7 rounded-lg text-[11px] font-medium text-zinc-500'); b.className='fit-btn active h-7 rounded-lg bg-white dark:bg-zinc-700 shadow-sm text-[11px] font-medium'; state.fit=b.dataset.fit; }));
+$('#resizeBg').addEventListener('input',e=> state.bgColor=e.target.value);
+$('#applyResizeBtn').addEventListener('click', async()=>{
   const w=parseInt($('#resizeW').value), h=parseInt($('#resizeH').value); if(!w||!h) return alert('Invalid dimensions');
+  if($('#noEnlarge').checked && (w>mainCanvas.width || h>mainCanvas.height)){ alert('Don\'t enlarge is enabled'); return; }
   const tmp=document.createElement('canvas'); tmp.width=w; tmp.height=h; const tCtx=tmp.getContext('2d');
-  if(fitMode==='stretch'){ tCtx.drawImage(mainCanvas,0,0,w,h); }
-  else if(fitMode==='contain'){ const ratio=Math.min(w/mainCanvas.width,h/mainCanvas.height); const nw=mainCanvas.width*ratio, nh=mainCanvas.height*ratio; const x=(w-nw)/2,y=(h-nh)/2; tCtx.fillStyle='#ffffff'; tCtx.fillRect(0,0,w,h); tCtx.drawImage(mainCanvas,x,y,nw,nh); }
-  else{ const ratio=Math.max(w/mainCanvas.width,h/mainCanvas.height); const nw=mainCanvas.width*ratio, nh=mainCanvas.height*ratio; const x=(w-nw)/2,y=(h-nh)/2; tCtx.drawImage(mainCanvas,x,y,nw,nh); }
+  // handle bg for contain
+  if(state.fit==='contain'){ tCtx.fillStyle=state.bgColor; tCtx.fillRect(0,0,w,h); }
+  // Use pica for high-quality resize if available and cover/stretch
+  if(picaInstance && state.picaReady){
+    try{
+      const srcCanvas=document.createElement('canvas'); srcCanvas.width=mainCanvas.width; srcCanvas.height=mainCanvas.height; srcCanvas.getContext('2d').drawImage(mainCanvas,0,0);
+      if(state.fit==='cover'){ const ratio=Math.max(w/srcCanvas.width, h/srcCanvas.height); const nw=srcCanvas.width*ratio, nh=srcCanvas.height*ratio; const x=(w-nw)/2, y=(h-nh)/2; const coverCanvas=document.createElement('canvas'); coverCanvas.width=w; coverCanvas.height=h; coverCanvas.getContext('2d').drawImage(srcCanvas,x,y,nw,nh); await picaInstance.resize(coverCanvas, tmp); }
+      else if(state.fit==='contain'){ const ratio=Math.min(w/srcCanvas.width, h/srcCanvas.height); const nw=srcCanvas.width*ratio, nh=srcCanvas.height*ratio; const x=(w-nw)/2, y=(h-nh)/2; const containCanvas=document.createElement('canvas'); containCanvas.width=w; containCanvas.height=h; const cCtx=containCanvas.getContext('2d'); cCtx.fillStyle=state.bgColor; cCtx.fillRect(0,0,w,h); cCtx.drawImage(srcCanvas,x,y,nw,nh); await picaInstance.resize(containCanvas, tmp); }
+      else { await picaInstance.resize(srcCanvas, tmp); }
+    }catch(e){ console.warn('pica failed, fallback',e); if(state.fit==='stretch'){ tCtx.drawImage(mainCanvas,0,0,w,h); } else if(state.fit==='contain'){ const ratio=Math.min(w/mainCanvas.width,h/mainCanvas.height); const nw=mainCanvas.width*ratio, nh=mainCanvas.height*ratio; const x=(w-nw)/2,y=(h-nh)/2; tCtx.drawImage(mainCanvas,x,y,nw,nh); } else { const ratio=Math.max(w/mainCanvas.width,h/mainCanvas.height); const nw=mainCanvas.width*ratio, nh=mainCanvas.height*ratio; const x=(w-nw)/2,y=(h-nh)/2; tCtx.drawImage(mainCanvas,x,y,nw,nh); } }
+  } else {
+    if(state.fit==='stretch'){ tCtx.drawImage(mainCanvas,0,0,w,h); }
+    else if(state.fit==='contain'){ const ratio=Math.min(w/mainCanvas.width,h/mainCanvas.height); const nw=mainCanvas.width*ratio, nh=mainCanvas.height*ratio; const x=(w-nw)/2,y=(h-nh)/2; tCtx.drawImage(mainCanvas,x,y,nw,nh); }
+    else{ const ratio=Math.max(w/mainCanvas.width,h/mainCanvas.height); const nw=mainCanvas.width*ratio, nh=mainCanvas.height*ratio; const x=(w-nw)/2,y=(h-nh)/2; tCtx.drawImage(mainCanvas,x,y,nw,nh); }
+  }
   mainCanvas.width=w; mainCanvas.height=h; ctx.clearRect(0,0,w,h); ctx.drawImage(tmp,0,0); pushHistory(); refreshCanvasContainer(); estimateSize();
 });
 
-/* Convert */
+/* Convert - complete */
 $$('.cformat-btn').forEach(b=> b.addEventListener('click',()=>{
   $$('.cformat-btn').forEach(x=> x.className='cformat-btn w-full flex items-center gap-3 p-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-left hover:border-zinc-300 focus-ring');
   b.className='cformat-btn active w-full flex items-center gap-3 p-3 rounded-xl border-[1.5px] border-zinc-900 dark:border-white bg-zinc-50 dark:bg-zinc-900 text-left focus-ring';
   state.cFormat=b.dataset.cformat; $('#convertQualityWrap').classList.toggle('hidden', state.cFormat==='image/png');
 }));
 $('#cQualityRange').addEventListener('input',e=>{ state.cQuality=+e.target.value; $('#cQualityVal').textContent=state.cQuality+'%'; });
-$('#applyConvertBtn').addEventListener('click',()=>{ downloadCanvas(state.cFormat, state.cFormat==='image/png'?undefined:state.cQuality/100); });
+$('#convertBg').addEventListener('input',e=> state.convertBg=e.target.value);
+$('#applyConvertBtn').addEventListener('click',()=>{
+  // If JPG and has transparency, fill bg first
+  if(state.cFormat==='image/jpeg'){
+    const tmp=document.createElement('canvas'); tmp.width=mainCanvas.width; tmp.height=mainCanvas.height; const tCtx=tmp.getContext('2d'); tCtx.fillStyle=state.convertBg; tCtx.fillRect(0,0,tmp.width,tmp.height); tCtx.drawImage(mainCanvas,0,0); mainCanvas.width=tmp.width; mainCanvas.height=tmp.height; ctx.drawImage(tmp,0,0); pushHistory();
+  }
+  downloadCanvas(state.cFormat, state.cFormat==='image/png'?undefined:state.cQuality/100);
+});
 
 /* Crop */
 let cropDragging=null, cropResizing=null, cropStart={};
 function enableCrop(){ $('#cropOverlay').classList.remove('hidden'); updateCropBox(); }
 function disableCrop(){ $('#cropOverlay').classList.add('hidden'); }
-function updateCropBox(){
-  const cont=$('#canvasContainer'), box=$('#cropBox'); const cw=cont.clientWidth, ch=cont.clientHeight;
-  box.style.left=(state.crop.x*cw)+'px'; box.style.top=(state.crop.y*ch)+'px'; box.style.width=(state.crop.w*cw)+'px'; box.style.height=(state.crop.h*ch)+'px';
-  $('#cropX').textContent=Math.round(state.crop.x*mainCanvas.width); $('#cropY').textContent=Math.round(state.crop.y*mainCanvas.height);
-  $('#cropW').textContent=Math.round(state.crop.w*mainCanvas.width); $('#cropH').textContent=Math.round(state.crop.h*mainCanvas.height);
-}
+function updateCropBox(){ const cont=$('#canvasContainer'), box=$('#cropBox'); const cw=cont.clientWidth, ch=cont.clientHeight; box.style.left=(state.crop.x*cw)+'px'; box.style.top=(state.crop.y*ch)+'px'; box.style.width=(state.crop.w*cw)+'px'; box.style.height=(state.crop.h*ch)+'px'; $('#cropX').textContent=Math.round(state.crop.x*mainCanvas.width); $('#cropY').textContent=Math.round(state.crop.y*mainCanvas.height); $('#cropW').textContent=Math.round(state.crop.w*mainCanvas.width); $('#cropH').textContent=Math.round(state.crop.h*mainCanvas.height); }
 function setCropRatio(r){ state.crop.ratio=r; if(r==='free') return; const [rw,rh]=r.split(':').map(Number); const ratio=rw/rh; const currentW=state.crop.w; let newH=currentW/ratio; if(state.crop.y+newH>1) newH=1-state.crop.y; state.crop.h=newH; updateCropBox(); }
 $$('.ratio-btn').forEach(b=> b.addEventListener('click',()=>{ $$('.ratio-btn').forEach(x=> x.className='ratio-btn h-8 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[11px]'); b.className='ratio-btn active h-8 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[11px] font-medium'; setCropRatio(b.dataset.ratio); }));
-const cropBox=$('#cropBox');
-cropBox.addEventListener('mousedown',e=>{ if(e.target.dataset.handle){ cropResizing=e.target.dataset.handle; } else { cropDragging=true; } cropStart={x:e.clientX,y:e.clientY,crop:{...state.crop}}; e.preventDefault(); });
+const cropBox=$('#cropBox'); cropBox.addEventListener('mousedown',e=>{ if(e.target.dataset.handle){ cropResizing=e.target.dataset.handle; } else { cropDragging=true; } cropStart={x:e.clientX,y:e.clientY,crop:{...state.crop}}; e.preventDefault(); });
 window.addEventListener('mousemove',e=>{
-  if(!cropDragging && !cropResizing) return;
-  const cont=$('#canvasContainer'); const cw=cont.clientWidth, ch=cont.clientHeight; const dx=(e.clientX-cropStart.x)/cw, dy=(e.clientY-cropStart.y)/ch;
+  if(!cropDragging && !cropResizing) return; const cont=$('#canvasContainer'); const cw=cont.clientWidth, ch=cont.clientHeight; const dx=(e.clientX-cropStart.x)/cw, dy=(e.clientY-cropStart.y)/ch;
   if(cropDragging){ let nx=cropStart.crop.x+dx, ny=cropStart.crop.y+dy; nx=Math.max(0,Math.min(1-state.crop.w,nx)); ny=Math.max(0,Math.min(1-state.crop.h,ny)); state.crop.x=nx; state.crop.y=ny; }
-  else if(cropResizing){ let {x,y,w,h}=cropStart.crop; const handle=cropResizing; if(handle.includes('e')) w=Math.max(0.05,w+dx); if(handle.includes('s')) h=Math.max(0.05,h+dy); if(handle.includes('w')){ const newW=Math.max(0.05,w-dx); x=x+(w-newW); w=newW; } if(handle.includes('n')){ const newH=Math.max(0.05,h-dy); y=y+(h-newH); h=newH; } if(x<0){ w+=x; x=0; } if(y<0){ h+=y; y=0; } if(x+w>1) w=1-x; if(y+h>1) h=1-y; if(state.crop.ratio!=='free'){ const [rw,rh]=state.crop.ratio.split(':').map(Number); const ratio=rw/rh; if(handle==='e'||handle==='w'||handle.includes('se')){ const targetH=w/ratio; if(handle.includes('n')) y=y+(h-targetH); h=targetH; } else { const targetW=h*ratio; if(handle.includes('w')) x=x+(w-targetW); w=targetW; } } state.crop.x=x; state.crop.y=y; state.crop.w=w; state.crop.h=h; }
-  updateCropBox();
+  else if(cropResizing){ let {x,y,w,h}=cropStart.crop; const handle=cropResizing; if(handle.includes('e')) w=Math.max(0.05,w+dx); if(handle.includes('s')) h=Math.max(0.05,h+dy); if(handle.includes('w')){ const newW=Math.max(0.05,w-dx); x=x+(w-newW); w=newW; } if(handle.includes('n')){ const newH=Math.max(0.05,h-dy); y=y+(h-newH); h=newH; } if(x<0){ w+=x; x=0; } if(y<0){ h+=y; y=0; } if(x+w>1) w=1-x; if(y+h>1) h=1-y; if(state.crop.ratio!=='free'){ const [rw,rh]=state.crop.ratio.split(':').map(Number); const ratio=rw/rh; if(handle==='e'||handle==='w'||handle.includes('se')){ const targetH=w/ratio; if(handle.includes('n')) y=y+(h-targetH); h=targetH; } else { const targetW=h*ratio; if(handle.includes('w')) x=x+(w-targetW); w=targetW; } } state.crop.x=x; state.crop.y=y; state.crop.w=w; state.crop.h=h; } updateCropBox();
 });
 window.addEventListener('mouseup',()=>{ cropDragging=null; cropResizing=null; });
-$('#cropApplyBtn').addEventListener('click',()=>{
-  const sx=Math.round(state.crop.x*mainCanvas.width), sy=Math.round(state.crop.y*mainCanvas.height), sw=Math.round(state.crop.w*mainCanvas.width), sh=Math.round(state.crop.h*mainCanvas.height); if(sw<1||sh<1) return;
-  const tmp=document.createElement('canvas'); tmp.width=sw; tmp.height=sh; tmp.getContext('2d').drawImage(mainCanvas,sx,sy,sw,sh,0,0,sw,sh);
-  mainCanvas.width=sw; mainCanvas.height=sh; ctx.drawImage(tmp,0,0); state.crop={x:0.1,y:0.1,w:0.8,h:0.8,ratio:state.crop.ratio}; updateCropBox(); pushHistory(); refreshCanvasContainer(); estimateSize();
-});
+$('#cropApplyBtn').addEventListener('click',()=>{ const sx=Math.round(state.crop.x*mainCanvas.width), sy=Math.round(state.crop.y*mainCanvas.height), sw=Math.round(state.crop.w*mainCanvas.width), sh=Math.round(state.crop.h*mainCanvas.height); if(sw<1||sh<1) return; const tmp=document.createElement('canvas'); tmp.width=sw; tmp.height=sh; tmp.getContext('2d').drawImage(mainCanvas,sx,sy,sw,sh,0,0,sw,sh); mainCanvas.width=sw; mainCanvas.height=sh; ctx.drawImage(tmp,0,0); state.crop={x:0.1,y:0.1,w:0.8,h:0.8,ratio:state.crop.ratio}; updateCropBox(); pushHistory(); refreshCanvasContainer(); estimateSize(); });
 $('#cropCancelBtn').addEventListener('click',()=>{ state.crop={x:0.1,y:0.1,w:0.8,h:0.8,ratio:state.crop.ratio}; updateCropBox(); });
 
 /* Rotate */
-$('#rotLeftBtn').addEventListener('click',()=> rotateCanvas(-90));
-$('#rotRightBtn').addEventListener('click',()=> rotateCanvas(90));
-$('#flipHBtn').addEventListener('click',()=> flipCanvas('h'));
-$('#flipVBtn').addEventListener('click',()=> flipCanvas('v'));
-$('#straightenRange').addEventListener('input',e=>{ $('#straightenVal').textContent=e.target.value+'°'; state.rotate.straighten=+e.target.value; });
-function rotateCanvas(deg){
-  state.rotate.angle=(state.rotate.angle+deg)%360;
-  const tmp=document.createElement('canvas'); const rad=deg*Math.PI/180; const w=mainCanvas.width,h=mainCanvas.height;
-  if(Math.abs(deg)%180===90){ tmp.width=h; tmp.height=w; } else { tmp.width=w; tmp.height=h; }
-  const tCtx=tmp.getContext('2d'); tCtx.translate(tmp.width/2,tmp.height/2); tCtx.rotate(rad); tCtx.drawImage(mainCanvas,-w/2,-h/2);
-  mainCanvas.width=tmp.width; mainCanvas.height=tmp.height; ctx.clearRect(0,0,tmp.width,tmp.height); ctx.drawImage(tmp,0,0); pushHistory(); refreshCanvasContainer();
-}
-function flipCanvas(dir){
-  const tmp=document.createElement('canvas'); tmp.width=mainCanvas.width; tmp.height=mainCanvas.height; const tCtx=tmp.getContext('2d');
-  if(dir==='h'){ tCtx.scale(-1,1); tCtx.drawImage(mainCanvas,-tmp.width,0); } else { tCtx.scale(1,-1); tCtx.drawImage(mainCanvas,0,-tmp.height); }
-  ctx.clearRect(0,0,tmp.width,tmp.height); ctx.drawImage(tmp,0,0); pushHistory();
-}
-$('#applyRotateBtn').addEventListener('click',()=>{
-  const deg=+$('#straightenRange').value; if(deg===0) return;
-  const tmp=document.createElement('canvas'); const rad=deg*Math.PI/180; const w=mainCanvas.width,h=mainCanvas.height;
-  const cos=Math.abs(Math.cos(rad)), sin=Math.abs(Math.sin(rad)); tmp.width=Math.round(w*cos+h*sin); tmp.height=Math.round(w*sin+h*cos);
-  const tCtx=tmp.getContext('2d'); tCtx.translate(tmp.width/2,tmp.height/2); tCtx.rotate(rad); tCtx.drawImage(mainCanvas,-w/2,-h/2);
-  mainCanvas.width=tmp.width; mainCanvas.height=tmp.height; ctx.drawImage(tmp,0,0); $('#straightenRange').value=0; $('#straightenVal').textContent='0°'; pushHistory(); refreshCanvasContainer();
-});
+$('#rotLeftBtn').addEventListener('click',()=> rotateCanvas(-90)); $('#rotRightBtn').addEventListener('click',()=> rotateCanvas(90)); $('#flipHBtn').addEventListener('click',()=> flipCanvas('h')); $('#flipVBtn').addEventListener('click',()=> flipCanvas('v')); $('#straightenRange').addEventListener('input',e=>{ $('#straightenVal').textContent=e.target.value+'°'; state.rotate.straighten=+e.target.value; });
+function rotateCanvas(deg){ state.rotate.angle=(state.rotate.angle+deg)%360; const tmp=document.createElement('canvas'); const rad=deg*Math.PI/180; const w=mainCanvas.width,h=mainCanvas.height; if(Math.abs(deg)%180===90){ tmp.width=h; tmp.height=w; } else { tmp.width=w; tmp.height=h; } const tCtx=tmp.getContext('2d'); tCtx.translate(tmp.width/2,tmp.height/2); tCtx.rotate(rad); tCtx.drawImage(mainCanvas,-w/2,-h/2); mainCanvas.width=tmp.width; mainCanvas.height=tmp.height; ctx.clearRect(0,0,tmp.width,tmp.height); ctx.drawImage(tmp,0,0); pushHistory(); refreshCanvasContainer(); }
+function flipCanvas(dir){ const tmp=document.createElement('canvas'); tmp.width=mainCanvas.width; tmp.height=mainCanvas.height; const tCtx=tmp.getContext('2d'); if(dir==='h'){ tCtx.scale(-1,1); tCtx.drawImage(mainCanvas,-tmp.width,0); } else { tCtx.scale(1,-1); tCtx.drawImage(mainCanvas,0,-tmp.height); } ctx.clearRect(0,0,tmp.width,tmp.height); ctx.drawImage(tmp,0,0); pushHistory(); }
+$('#applyRotateBtn').addEventListener('click',()=>{ const deg=+$('#straightenRange').value; if(deg===0) return; const tmp=document.createElement('canvas'); const rad=deg*Math.PI/180; const w=mainCanvas.width,h=mainCanvas.height; const cos=Math.abs(Math.cos(rad)), sin=Math.abs(Math.sin(rad)); tmp.width=Math.round(w*cos+h*sin); tmp.height=Math.round(w*sin+h*cos); const tCtx=tmp.getContext('2d'); tCtx.translate(tmp.width/2,tmp.height/2); tCtx.rotate(rad); tCtx.drawImage(mainCanvas,-w/2,-h/2); mainCanvas.width=tmp.width; mainCanvas.height=tmp.height; ctx.drawImage(tmp,0,0); $('#straightenRange').value=0; $('#straightenVal').textContent='0°'; pushHistory(); refreshCanvasContainer(); });
 
 /* Filters */
 function buildFilterString(){ const f=state.filters; let str=`brightness(${f.brightness}%) contrast(${f.contrast}%) saturate(${f.saturate}%) blur(${f.blur}px) hue-rotate(${f.hue}deg)`; if(f.grayscale) str+=' grayscale(1)'; if(f.sepia) str+=' sepia(1)'; if(f.invert) str+=' invert(1)'; return str; }
-function applyFiltersPreview(){
-  if(state.history.length===0) return; const img=new Image();
-  img.onload=()=>{ ctx.filter=buildFilterString(); ctx.clearRect(0,0,mainCanvas.width,mainCanvas.height); ctx.drawImage(img,0,0,mainCanvas.width,mainCanvas.height); ctx.filter='none'; };
-  img.src=state.history[state.historyIndex];
-}
-$$('.filter-range').forEach(inp=>{
-  inp.addEventListener('input',e=>{
-    const type=e.target.dataset.filter, val=+e.target.value;
-    if(type==='brightness'){ state.filters.brightness=val; $('#bVal').textContent=val+'%'; }
-    if(type==='contrast'){ state.filters.contrast=val; $('#cVal').textContent=val+'%'; }
-    if(type==='saturate'){ state.filters.saturate=val; $('#sVal').textContent=val+'%'; }
-    if(type==='blur'){ state.filters.blur=val; $('#blVal').textContent=val+'px'; }
-    if(type==='hue'){ state.filters.hue=val; $('#hVal').textContent=val+'°'; }
-    applyFiltersPreview();
-  });
-});
+function applyFiltersPreview(){ if(state.history.length===0) return; const img=new Image(); img.onload=()=>{ ctx.filter=buildFilterString(); ctx.clearRect(0,0,mainCanvas.width,mainCanvas.height); ctx.drawImage(img,0,0,mainCanvas.width,mainCanvas.height); ctx.filter='none'; }; img.src=state.history[state.historyIndex]; }
+$$('.filter-range').forEach(inp=>{ inp.addEventListener('input',e=>{ const type=e.target.dataset.filter, val=+e.target.value; if(type==='brightness'){ state.filters.brightness=val; $('#bVal').textContent=val+'%'; } if(type==='contrast'){ state.filters.contrast=val; $('#cVal').textContent=val+'%'; } if(type==='saturate'){ state.filters.saturate=val; $('#sVal').textContent=val+'%'; } if(type==='blur'){ state.filters.blur=val; $('#blVal').textContent=val+'px'; } if(type==='hue'){ state.filters.hue=val; $('#hVal').textContent=val+'°'; } applyFiltersPreview(); }); });
 $$('.filter-check').forEach(chk=>{ chk.addEventListener('change',e=>{ const type=e.target.dataset.filter; state.filters[type]=e.target.checked; applyFiltersPreview(); }); });
-$('#clearFiltersBtn').addEventListener('click',()=>{
-  state.filters={brightness:100,contrast:100,saturate:100,blur:0,hue:0,grayscale:false,sepia:false,invert:false};
-  $$('.filter-range').forEach(r=>{ const t=r.dataset.filter; if(t==='brightness'||t==='contrast'||t==='saturate') r.value=100; if(t==='blur') r.value=0; if(t==='hue') r.value=0; });
-  $$('.filter-check').forEach(c=> c.checked=false); $('#bVal').textContent='100%'; $('#cVal').textContent='100%'; $('#sVal').textContent='100%'; $('#blVal').textContent='0px'; $('#hVal').textContent='0°'; applyFiltersPreview();
-});
+$('#clearFiltersBtn').addEventListener('click',()=>{ state.filters={brightness:100,contrast:100,saturate:100,blur:0,hue:0,grayscale:false,sepia:false,invert:false}; $$('.filter-range').forEach(r=>{ const t=r.dataset.filter; if(t==='brightness'||t==='contrast'||t==='saturate') r.value=100; if(t==='blur') r.value=0; if(t==='hue') r.value=0; }); $$('.filter-check').forEach(c=> c.checked=false); $('#bVal').textContent='100%'; $('#cVal').textContent='100%'; $('#sVal').textContent='100%'; $('#blVal').textContent='0px'; $('#hVal').textContent='0°'; applyFiltersPreview(); });
 $('#applyFiltersBtn').addEventListener('click',()=>{ pushHistory(); estimateSize(); });
 
 /* Watermark */
-$('#wmText').addEventListener('input',e=>{ state.watermark.text=e.target.value; applyWmPreview(); });
-$('#wmSize').addEventListener('input',e=>{ state.watermark.size=+e.target.value; $('#wmSizeVal').textContent=e.target.value; applyWmPreview(); });
-$('#wmOpacity').addEventListener('input',e=>{ state.watermark.opacity=+e.target.value; $('#wmOpacityVal').textContent=e.target.value; applyWmPreview(); });
-$('#wmColor').addEventListener('input',e=>{ state.watermark.color=e.target.value; applyWmPreview(); });
+$('#wmText').addEventListener('input',e=>{ state.watermark.text=e.target.value; applyWmPreview(); }); $('#wmSize').addEventListener('input',e=>{ state.watermark.size=+e.target.value; $('#wmSizeVal').textContent=e.target.value; applyWmPreview(); }); $('#wmOpacity').addEventListener('input',e=>{ state.watermark.opacity=+e.target.value; $('#wmOpacityVal').textContent=e.target.value; applyWmPreview(); }); $('#wmColor').addEventListener('input',e=>{ state.watermark.color=e.target.value; applyWmPreview(); });
 $$('.wm-pos').forEach(b=> b.addEventListener('click',()=>{ $$('.wm-pos').forEach(x=> x.className='wm-pos h-7 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[10px]'); b.className='wm-pos active h-7 rounded-lg border bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[10px]'; state.watermark.pos=b.dataset.pos; applyWmPreview(); }));
-function applyWmPreview(){
-  if(!state.history[state.historyIndex]) return; const img=new Image();
-  img.onload=()=>{
-    ctx.clearRect(0,0,mainCanvas.width,mainCanvas.height); ctx.drawImage(img,0,0); if(!state.watermark.text) return;
-    ctx.save(); ctx.globalAlpha=state.watermark.opacity/100; ctx.fillStyle=state.watermark.color; ctx.font=`bold ${state.watermark.size}px Inter, sans-serif`; ctx.textBaseline='middle';
-    const metrics=ctx.measureText(state.watermark.text); const pad=20; let x=pad,y=mainCanvas.height/2; const pos=state.watermark.pos;
-    if(pos.includes('t')) y=pad+state.watermark.size/2; if(pos.includes('b')) y=mainCanvas.height-pad-state.watermark.size/2;
-    if(pos==='tc'||pos==='bc'||pos==='mc') x=(mainCanvas.width-metrics.width)/2;
-    if(pos==='tl'||pos==='ml'||pos==='bl') x=pad; if(pos==='tr'||pos==='mr'||pos==='br') x=mainCanvas.width-metrics.width-pad; if(pos==='mc') y=mainCanvas.height/2;
-    ctx.shadowColor='rgba(0,0,0,0.5)'; ctx.shadowBlur=8; ctx.shadowOffsetY=2; ctx.fillText(state.watermark.text,x,y); ctx.restore();
-  };
-  img.src=state.history[state.historyIndex];
-}
+function applyWmPreview(){ if(!state.history[state.historyIndex]) return; const img=new Image(); img.onload=()=>{ ctx.clearRect(0,0,mainCanvas.width,mainCanvas.height); ctx.drawImage(img,0,0); if(!state.watermark.text) return; ctx.save(); ctx.globalAlpha=state.watermark.opacity/100; ctx.fillStyle=state.watermark.color; ctx.font=`bold ${state.watermark.size}px Inter, sans-serif`; ctx.textBaseline='middle'; const metrics=ctx.measureText(state.watermark.text); const pad=20; let x=pad,y=mainCanvas.height/2; const pos=state.watermark.pos; if(pos.includes('t')) y=pad+state.watermark.size/2; if(pos.includes('b')) y=mainCanvas.height-pad-state.watermark.size/2; if(pos==='tc'||pos==='bc'||pos==='mc') x=(mainCanvas.width-metrics.width)/2; if(pos==='tl'||pos==='ml'||pos==='bl') x=pad; if(pos==='tr'||pos==='mr'||pos==='br') x=mainCanvas.width-metrics.width-pad; if(pos==='mc') y=mainCanvas.height/2; ctx.shadowColor='rgba(0,0,0,0.5)'; ctx.shadowBlur=8; ctx.shadowOffsetY=2; ctx.fillText(state.watermark.text,x,y); ctx.restore(); }; img.src=state.history[state.historyIndex]; }
 $('#applyWmBtn').addEventListener('click',()=>{ pushHistory(); });
 
-/* Zoom & Compare - Squoosh pattern */
+/* Zoom & Compare */
 $('#zoomInBtn').addEventListener('click',()=>{ state.zoom=Math.min(300,state.zoom+25); $('#zoomLabel').textContent=state.zoom+'%'; $('#canvasContainer').style.transform=`scale(${state.zoom/100})`; });
 $('#zoomOutBtn').addEventListener('click',()=>{ state.zoom=Math.max(25,state.zoom-25); $('#zoomLabel').textContent=state.zoom+'%'; $('#canvasContainer').style.transform=`scale(${state.zoom/100})`; });
-$('#compareBtn').addEventListener('click',()=>{
-  state.compare=!state.compare; $('#compareWrap').classList.toggle('hidden',!state.compare);
-  $('#compareBtn').classList.toggle('!bg-zinc-900',state.compare); $('#compareBtn').classList.toggle('!text-white',state.compare); $('#compareBtn').classList.toggle('dark:!bg-white',state.compare); $('#compareBtn').classList.toggle('dark:!text-zinc-900',state.compare);
-});
+$('#compareBtn').addEventListener('click',()=>{ state.compare=!state.compare; $('#compareWrap').classList.toggle('hidden',!state.compare); $('#compareBtn').classList.toggle('!bg-zinc-900',state.compare); $('#compareBtn').classList.toggle('!text-white',state.compare); });
 $('#compareRange').addEventListener('input',e=>{ const v=e.target.value; $('#compareLeft').style.width=v+'%'; $('#compareHandle').style.left=v+'%'; });
 
 /* History */
@@ -686,45 +640,22 @@ document.addEventListener('keydown',e=>{
   if(e.key==='c'&&!e.ctrlKey&&!e.metaKey&&!e.target.matches('input,textarea')){ $('#compareBtn').click(); }
   if(e.key>='1'&&e.key<='7'&&!e.target.matches('input,textarea')){ const tools=['compress','resize','convert','crop','rotate','adjust','watermark']; const idx=parseInt(e.key)-1; const btn=document.querySelector(`[data-tool="${tools[idx]}"]`); if(btn) btn.click(); }
 });
-$('#resetBtn').addEventListener('click',()=>{
-  if(!state.originalImg) return; mainCanvas.width=state.originalWidth; mainCanvas.height=state.originalHeight; ctx.clearRect(0,0,mainCanvas.width,mainCanvas.height); ctx.drawImage(state.originalImg,0,0); state.history=[]; state.historyIndex=-1; pushHistory(); refreshCanvasContainer(); estimateSize();
-});
+$('#resetBtn').addEventListener('click',()=>{ if(!state.originalImg) return; mainCanvas.width=state.originalWidth; mainCanvas.height=state.originalHeight; ctx.clearRect(0,0,mainCanvas.width,mainCanvas.height); ctx.drawImage(state.originalImg,0,0); state.history=[]; state.historyIndex=-1; pushHistory(); refreshCanvasContainer(); estimateSize(); });
 
 /* Download */
 function downloadCanvas(mime='image/jpeg', quality=0.85){
   const fmt=mime.split('/')[1]; const name=(state.originalFile?.name?.split('.').slice(0,-1).join('.')||'image')+`.${fmt==='jpeg'?'jpg':fmt}`;
   mainCanvas.toBlob(blob=>{ if(!blob) return; const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000); }, mime, quality);
 }
-$('#downloadBtn').addEventListener('click',()=>{
-  const mime=state.format==='original'?(state.originalFile?.type||'image/jpeg'):state.format; const q=state.format==='image/png'?undefined:state.quality/100; downloadCanvas(mime,q);
-});
+$('#downloadBtn').addEventListener('click',()=>{ const mime=state.format==='original'?(state.originalFile?.type||'image/jpeg'):state.format; if(mime==='target'){ downloadCanvas('image/jpeg', state.quality/100); return; } const q=state.format==='image/png'?undefined:state.quality/100; downloadCanvas(mime,q); });
 
 /* Batch */
-function renderBatch(){
-  const list=$('#batchList'), strip=$('#batchStrip'), count=$('#batchCount');
-  if(state.batch.length<=1){ strip.classList.add('hidden'); return; }
-  strip.classList.remove('hidden'); count.textContent=state.batch.length; list.innerHTML='';
-  state.batch.forEach((item,i)=>{
-    const div=document.createElement('div'); div.className='relative w-[72px] h-[72px] rounded-xl overflow-hidden bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex-shrink-0 group cursor-pointer';
-    div.innerHTML=`<img src="${item.dataUrl}" class="w-full h-full object-cover"><div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1"><button class="w-5 h-5 rounded-full bg-white text-zinc-900 text-[10px] select-btn">✓</button><button class="w-5 h-5 rounded-full bg-red-500 text-white text-[10px] del-btn">✕</button></div><div class="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] px-1 py-0.5 truncate">${item.name}</div>`;
-    div.querySelector('.select-btn').addEventListener('click',e=>{ e.stopPropagation(); loadFile(item.file); });
-    div.querySelector('.del-btn').addEventListener('click',e=>{ e.stopPropagation(); state.batch.splice(i,1); renderBatch(); if(state.batch.length===0) showEmpty(); });
-    div.addEventListener('click',()=> loadFile(item.file)); list.appendChild(div);
-  });
-}
+function renderBatch(){ const list=$('#batchList'), strip=$('#batchStrip'), count=$('#batchCount'); if(state.batch.length<=1){ strip.classList.add('hidden'); return; } strip.classList.remove('hidden'); count.textContent=state.batch.length; list.innerHTML=''; state.batch.forEach((item,i)=>{ const div=document.createElement('div'); div.className='relative w-[72px] h-[72px] rounded-xl overflow-hidden bg-zinc-100 dark:bg-zinc-800 border flex-shrink-0 group cursor-pointer'; div.innerHTML=`<img src="${item.dataUrl}" class="w-full h-full object-cover"><div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1"><button class="w-5 h-5 rounded-full bg-white text-zinc-900 text-[10px] select-btn">✓</button><button class="w-5 h-5 rounded-full bg-red-500 text-white text-[10px] del-btn">✕</button></div><div class="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] px-1 py-0.5 truncate">${item.name}</div>`; div.querySelector('.select-btn').addEventListener('click',e=>{ e.stopPropagation(); loadFile(item.file); }); div.querySelector('.del-btn').addEventListener('click',e=>{ e.stopPropagation(); state.batch.splice(i,1); renderBatch(); if(state.batch.length===0) showEmpty(); }); div.addEventListener('click',()=> loadFile(item.file)); list.appendChild(div); }); }
 $('#clearBatchBtn').addEventListener('click',()=>{ state.batch=[]; renderBatch(); showEmpty(); });
-$('#batchZipBtn').addEventListener('click', async()=>{
-  if(state.batch.length===0) return; const zip=new JSZip(); const mime=state.format==='original'?'image/jpeg':state.format; const q=state.quality/100;
-  for(let i=0;i<state.batch.length;i++){ const item=state.batch[i]; const tmpCanvas=document.createElement('canvas'); tmpCanvas.width=item.img.width; tmpCanvas.height=item.img.height; tmpCanvas.getContext('2d').drawImage(item.img,0,0); const blob=await new Promise(res=> tmpCanvas.toBlob(res,mime,q)); if(blob){ const ext=mime.split('/')[1]==='jpeg'?'jpg':mime.split('/')[1]; const base=item.name.split('.').slice(0,-1).join('.')||'image'; zip.file(`${base}.${ext}`,blob); } }
-  const content=await zip.generateAsync({type:'blob'}); const url=URL.createObjectURL(content); const a=document.createElement('a'); a.href=url; a.download='imgtool-batch.zip'; a.click(); setTimeout(()=>URL.revokeObjectURL(url),2000);
-});
+$('#batchZipBtn').addEventListener('click', async()=>{ if(state.batch.length===0) return; const zip=new JSZip(); const mime=state.format==='original'?'image/jpeg':state.format==='target'?'image/jpeg':state.format; const q=state.quality/100; for(let i=0;i<state.batch.length;i++){ const item=state.batch[i]; const tmpCanvas=document.createElement('canvas'); tmpCanvas.width=item.img.width; tmpCanvas.height=item.img.height; tmpCanvas.getContext('2d').drawImage(item.img,0,0); const blob=await new Promise(res=> tmpCanvas.toBlob(res,mime,q)); if(blob){ const ext=mime.split('/')[1]==='jpeg'?'jpg':mime.split('/')[1]; const base=item.name.split('.').slice(0,-1).join('.')||'image'; zip.file(`${base}.${ext}`,blob); } } const content=await zip.generateAsync({type:'blob'}); const url=URL.createObjectURL(content); const a=document.createElement('a'); a.href=url; a.download='imgtool-batch.zip'; a.click(); setTimeout(()=>URL.revokeObjectURL(url),2000); });
 
 /* Theme */
-const themeBtn=$('#themeBtn');
-function setTheme(dark){ document.documentElement.classList.toggle('dark',dark); localStorage.setItem('imgtool-theme',dark?'dark':'light'); lucide.createIcons(); }
-setTheme(localStorage.getItem('imgtool-theme')==='dark' || (!localStorage.getItem('imgtool-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches));
-themeBtn.addEventListener('click',()=> setTheme(!document.documentElement.classList.contains('dark')));
-refreshCanvasContainer();
+const themeBtn=$('#themeBtn'); function setTheme(dark){ document.documentElement.classList.toggle('dark',dark); localStorage.setItem('imgtool-theme',dark?'dark':'light'); lucide.createIcons(); } setTheme(localStorage.getItem('imgtool-theme')==='dark' || (!localStorage.getItem('imgtool-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)); themeBtn.addEventListener('click',()=> setTheme(!document.documentElement.classList.contains('dark'))); refreshCanvasContainer();
 </script>
 </body>
 </html>
