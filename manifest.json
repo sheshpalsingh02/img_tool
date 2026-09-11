@@ -1,0 +1,56 @@
+{
+  "name": "ImgTool Studio — Compress, Resize, Convert",
+  "short_name": "ImgTool",
+  "description": "Privacy-first image toolkit. 100% browser, Canvas + WASM, no upload. Compress, resize, convert, crop, rotate, filters, watermark.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "browser"],
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#111111",
+  "categories": ["photo", "graphics", "utilities"],
+  "lang": "en",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%23111'/%3E%3Ctext x='50' y='58' font-family='Inter' font-weight='800' font-size='48' fill='white' text-anchor='middle'%3EI%3C/text%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Compress Image",
+      "url": "/?tool=compress",
+      "description": "Compress JPG, PNG, WebP, AVIF"
+    },
+    {
+      "name": "Resize Image",
+      "url": "/?tool=resize",
+      "description": "Resize with WASM Lanczos"
+    }
+  ],
+  "screenshots": [],
+  "edge_side_panel": {
+    "preferred_width": 400
+  },
+  "launch_handler": {
+    "client_mode": "auto"
+  },
+  "handle_links": "preferred",
+  "file_handlers": [
+    {
+      "action": "/",
+      "accept": {
+        "image/*": [".jpg", ".jpeg", ".png", ".webp", ".avif", ".gif", ".bmp"]
+      }
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /private/
+Disallow: /api/
+
+Sitemap: https://imgtool.studio/sitemap.xml
+
+# Production notes:
+# - All image processing is client-side, no upload
+# - No tracking cookies
+# - CDN assets: tailwind, jszip, lucide, pica
